@@ -64,17 +64,18 @@ src/
 
 ## ➕ Adding Questions
 
-Edit any file in `src/data/questions/`. Each question follows this shape:
+Edit `public/data/questions.json`. It is a map of category id → array of questions. Each question follows this shape:
 
-```ts
+```json
 {
-  id: "unique_id",
-  level: "beginner" | "intermediate" | "advanced" | "expert",
-  q: "Your question text",
-  a: `Multi-line answer
-with code examples`
+  "id": "unique_id",
+  "level": "beginner",
+  "q": "Your question text",
+  "a": "Multi-line answer\\nwith code examples (escape quotes and newlines in JSON)"
 }
 ```
+
+Valid `level` values: `beginner`, `intermediate`, `advanced`, `expert`. Category keys must match ids in `src/data/categories.ts`.
 
 ## 🛠️ Tech Stack
 

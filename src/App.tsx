@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { DiffFilter, StatusFilter, Status } from './types';
 import { CATEGORIES } from './data/categories';
-import { QUESTIONS, ALL_QUESTIONS } from './data/questions';
 import { useProgress, getStats } from './hooks/useProgress';
+import { useQuestions } from './hooks/useQuestions';
 
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -19,10 +19,11 @@ export default function App() {
   const [resetConfirm, setResetConfirm] = useState(false);
 
   const { progress, mark, reset } = useProgress();
+  const { questions: QUESTIONS, allQuestions: ALL_QUESTIONS, loading, error } = useQuestions();
 
-  const globalStats = useMemo(() => getStats(ALL_QUESTIONS, progress), [progress]);
+  const globalStats = useMemo(() => getStats(ALL_QUESTIONS, progress), [ALL_QUESTIONS, progress]);
 
-  const catQuestions = useMemo(() => QUESTIONS[activeCategory] ?? [], [activeCategory]);
+  const catQuestions = useMemo(() => QUESTIONS[activeCategory] ?? [], [QUESTIONS, activeCategory]);
 
   const filtered = useMemo(() => catQuestions.filter(q => {
     if (diffFilter !== 'all' && q.level !== diffFilter) return false;
@@ -60,6 +61,28 @@ export default function App() {
 
   const activeCat = CATEGORIES.find(c => c.id === activeCategory);
 
+  if (loading) {
+    return (
+      <div className="app app--loading">
+        <div className="load-panel">
+          <div className="load-spinner" aria-hidden />
+          <p>Loading questions…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="app app--loading">
+        <div className="load-panel load-panel--error">
+          <p>Could not load question data.</p>
+          <p className="load-detail">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <Header
@@ -67,7 +90,7 @@ export default function App() {
         onReset={handleReset}
       />
       <div className="body">
-        <Sidebar active={activeCategory} progress={progress} onSelect={handleSelect} />
+        <Sidebar active={activeCategory} questions={QUESTIONS} progress={progress} onSelect={handleSelect} />
         <main className="main">
           <ProgressOverview stats={globalStats} />
 

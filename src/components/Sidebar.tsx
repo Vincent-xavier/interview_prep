@@ -1,29 +1,50 @@
-import { Category, Progress } from '../types';
+import { Category, Progress, Question } from '../types';
 import { GROUPS } from '../data/categories';
-import { QUESTIONS } from '../data/questions';
 import { getStats } from '../hooks/useProgress';
 
 interface SidebarProps {
   active: string;
+  questions: Record<string, Question[]>;
   progress: Progress;
   onSelect: (id: string) => void;
 }
 
-export default function Sidebar({ active, progress, onSelect }: SidebarProps) {
+export default function Sidebar({ active, questions, progress, onSelect }: SidebarProps) {
   return (
     <aside className="sidebar">
       {Object.entries(GROUPS).map(([group, cats]) => (
         <div key={group}>
           <div className="sidebar-group-label">{group}</div>
-          {cats.map(cat => <CatItem key={cat.id} cat={cat} active={active === cat.id} progress={progress} onSelect={onSelect} />)}
+          {cats.map(cat => (
+            <CatItem
+              key={cat.id}
+              cat={cat}
+              active={active === cat.id}
+              questions={questions}
+              progress={progress}
+              onSelect={onSelect}
+            />
+          ))}
         </div>
       ))}
     </aside>
   );
 }
 
-function CatItem({ cat, active, progress, onSelect }: { cat: Category; active: boolean; progress: Progress; onSelect: (id: string) => void }) {
-  const qs = QUESTIONS[cat.id] ?? [];
+function CatItem({
+  cat,
+  active,
+  questions,
+  progress,
+  onSelect,
+}: {
+  cat: Category;
+  active: boolean;
+  questions: Record<string, Question[]>;
+  progress: Progress;
+  onSelect: (id: string) => void;
+}) {
+  const qs = questions[cat.id] ?? [];
   const st = getStats(qs, progress);
   const pct = qs.length > 0 ? (st.answered / qs.length) * 100 : 0;
 

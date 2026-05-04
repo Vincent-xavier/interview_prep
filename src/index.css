@@ -37,6 +37,19 @@ html, body, #root {
 
 /* ─── LAYOUT ─── */
 .app { display: flex; flex-direction: column; height: 100vh; }
+.app--loading { align-items: center; justify-content: center; }
+.load-panel { text-align: center; color: var(--text2); max-width: 28rem; padding: 24px; }
+.load-panel--error { color: var(--text); }
+.load-detail { font-size: 13px; margin-top: 10px; color: var(--text3); font-family: var(--font-mono); }
+.load-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: load-spin 0.75s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes load-spin { to { transform: rotate(360deg); } }
 
 /* ─── HEADER ─── */
 .header {
