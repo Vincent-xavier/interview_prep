@@ -422,8 +422,6 @@ ReverseWords("the sky is blue"); // "blue is sky the"` },
 }
 
 MinWindow("ADOBECODEBANC", "ABC"); // "BANC"` },
-],
-// ─── EXTRA REACT ───
 ];
 
 export default questions;
