@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Progress, Status, CategoryStats } from '../types';
 import { Question } from '../types';
+import { PROGRESS_STORAGE_KEY } from '../data/storageKeys';
 
-const STORAGE_KEY = 'vincent_interview_prep_v2';
+const STORAGE_KEY = PROGRESS_STORAGE_KEY;
 
 function load(): Progress {
   try {
@@ -36,7 +37,11 @@ export function useProgress() {
 
   const reset = useCallback(() => setProgress({}), []);
 
-  return { progress, mark, reset };
+  const replace = useCallback((next: Progress) => {
+    setProgress({ ...next });
+  }, []);
+
+  return { progress, mark, reset, replace };
 }
 
 export function getStats(questions: Question[], progress: Progress): CategoryStats {

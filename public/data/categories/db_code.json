@@ -1,0 +1,122 @@
+[
+  {
+    "id": "dbc1",
+    "level": "beginner",
+    "q": "Write a SQL query to find the second highest salary from an Employees table.\nTable: Employees(id, name, salary)",
+    "a": "-- Method 1: Using LIMIT/OFFSET (PostgreSQL, MySQL)\nSELECT DISTINCT salary\nFROM Employees\nORDER BY salary DESC\nLIMIT 1 OFFSET 1;\n\n-- Method 2: Using subquery (portable)\nSELECT MAX(salary) AS second_highest\nFROM Employees\nWHERE salary < (SELECT MAX(salary) FROM Employees);\n\n-- Method 3: Return NULL if no second highest exists\nSELECT (\n  SELECT DISTINCT salary\n  FROM Employees\n  ORDER BY salary DESC\n  LIMIT 1 OFFSET 1\n) AS SecondHighestSalary;\n\n-- Method 4: Using DENSE_RANK (handles ties correctly)\nSELECT salary\nFROM (\n  SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk\n  FROM Employees\n) ranked\nWHERE rnk = 2\nLIMIT 1;"
+  },
+  {
+    "id": "dbc2",
+    "level": "beginner",
+    "q": "Find the Nth highest salary from the Employees table.\nWrite a query or function that accepts N as a parameter.",
+    "a": "-- PostgreSQL parameterized approach:\n-- For N = 3 (third highest)\nSELECT DISTINCT salary\nFROM Employees\nORDER BY salary DESC\nLIMIT 1 OFFSET (3 - 1);  -- OFFSET = N - 1\n\n-- Reusable with DENSE_RANK (handles ties):\nSELECT salary\nFROM (\n  SELECT salary,\n         DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk\n  FROM Employees\n) ranked\nWHERE rnk = 3;  -- Replace 3 with N\n\n-- SQL Server function:\nCREATE FUNCTION GetNthHighest(@N INT)\nRETURNS TABLE AS\nRETURN (\n  SELECT salary FROM (\n    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk\n    FROM Employees\n  ) t WHERE rnk = @N\n);\n\n-- DENSE_RANK vs RANK for ties:\n-- Salaries: 100, 100, 90, 80\n-- RANK: 1, 1, 3, 4   (skips 2)\n-- DENSE_RANK: 1, 1, 2, 3  (no skip — better for \"Nth highest\")"
+  },
+  {
+    "id": "dbc3",
+    "level": "beginner",
+    "q": "Find all employees who earn more than their manager.\nTable: Employee(id, name, salary, managerId)",
+    "a": "-- Self JOIN approach\nSELECT e.name AS Employee\nFROM Employee e\nJOIN Employee m ON e.managerId = m.id\nWHERE e.salary > m.salary;\n\n-- Alternative with subquery:\nSELECT name\nFROM Employee e\nWHERE salary > (\n  SELECT salary FROM Employee WHERE id = e.managerId\n);\n\n-- Sample data:\n-- id:1 Joe  salary:70000 managerId:3\n-- id:2 Henry salary:80000 managerId:4\n-- id:3 Sam  salary:60000 managerId:NULL\n-- id:4 Max  salary:90000 managerId:NULL\n-- Result: Joe (70000 > 60000 = Sam's salary)"
+  },
+  {
+    "id": "dbc4",
+    "level": "intermediate",
+    "q": "Find duplicate emails in a Person table. Return only the duplicated emails.\nTable: Person(id, email)",
+    "a": "-- Method 1: GROUP BY + HAVING\nSELECT email\nFROM Person\nGROUP BY email\nHAVING COUNT(*) > 1;\n\n-- Method 2: Window function\nSELECT DISTINCT email\nFROM (\n  SELECT email, COUNT(*) OVER (PARTITION BY email) AS cnt\n  FROM Person\n) t\nWHERE cnt > 1;\n\n-- Method 3: Self join\nSELECT DISTINCT p1.email\nFROM Person p1\nJOIN Person p2 ON p1.email = p2.email AND p1.id != p2.id;\n\n-- Find ALL rows that are duplicates (not just the email):\nSELECT * FROM Person\nWHERE email IN (\n  SELECT email FROM Person GROUP BY email HAVING COUNT(*) > 1\n);"
+  },
+  {
+    "id": "dbc5",
+    "level": "intermediate",
+    "q": "Delete duplicate rows from the Person table, keeping only the row with the smallest id for each email.\nTable: Person(id, email)",
+    "a": "-- PostgreSQL / MySQL 8+:\nDELETE FROM Person\nWHERE id NOT IN (\n  SELECT MIN(id) FROM Person GROUP BY email\n);\n\n-- Alternative using CTE (PostgreSQL):\nWITH duplicates AS (\n  SELECT id,\n         ROW_NUMBER() OVER (PARTITION BY email ORDER BY id) AS rn\n  FROM Person\n)\nDELETE FROM Person\nWHERE id IN (SELECT id FROM duplicates WHERE rn > 1);\n\n-- SQL Server:\nWITH CTE AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY email ORDER BY id) AS rn\n  FROM Person\n)\nDELETE FROM CTE WHERE rn > 1;\n\n-- Always run SELECT first to verify what will be deleted!\n-- Replace DELETE with SELECT * to preview."
+  },
+  {
+    "id": "dbc6",
+    "level": "intermediate",
+    "q": "Write a query to get the highest salary in each department.\nTables: Employee(id, name, salary, departmentId), Department(id, name)",
+    "a": "-- Method 1: JOIN + GROUP BY\nSELECT d.name AS Department, MAX(e.salary) AS MaxSalary\nFROM Employee e\nJOIN Department d ON e.departmentId = d.id\nGROUP BY d.name;\n\n-- Method 2: Show the employee name too (with ties handling)\nSELECT d.name AS Department, e.name AS Employee, e.salary\nFROM Employee e\nJOIN Department d ON e.departmentId = d.id\nWHERE (e.departmentId, e.salary) IN (\n  SELECT departmentId, MAX(salary)\n  FROM Employee\n  GROUP BY departmentId\n);\n\n-- Method 3: Using window function (cleanest)\nSELECT Department, Employee, Salary\nFROM (\n  SELECT d.name AS Department, e.name AS Employee, e.salary AS Salary,\n         RANK() OVER (PARTITION BY e.departmentId ORDER BY e.salary DESC) AS rnk\n  FROM Employee e JOIN Department d ON e.departmentId = d.id\n) ranked\nWHERE rnk = 1;"
+  },
+  {
+    "id": "dbc7",
+    "level": "intermediate",
+    "q": "Find the top 3 highest-paid employees in each department.\nTables: Employee(id, name, salary, departmentId), Department(id, name)",
+    "a": "-- Using DENSE_RANK window function\nSELECT Department, Employee, Salary\nFROM (\n  SELECT\n    d.name AS Department,\n    e.name AS Employee,\n    e.salary AS Salary,\n    DENSE_RANK() OVER (\n      PARTITION BY e.departmentId\n      ORDER BY e.salary DESC\n    ) AS salary_rank\n  FROM Employee e\n  JOIN Department d ON e.departmentId = d.id\n) ranked\nWHERE salary_rank <= 3\nORDER BY Department, salary_rank;\n\n-- Why DENSE_RANK over RANK?\n-- If two people tie for 2nd, RANK gives them 2 and skips 3 → only 2 people shown.\n-- DENSE_RANK gives them both 2, then 3rd gets 3 → correct top 3.\n\n-- Why not ROW_NUMBER?\n-- ROW_NUMBER doesn't handle ties — arbitrarily picks one winner.\n-- DENSE_RANK is the correct choice for \"top N\" salary problems."
+  },
+  {
+    "id": "dbc8",
+    "level": "intermediate",
+    "q": "Write a query to find consecutive numbers — numbers that appear at least 3 times consecutively.\nTable: Logs(id, num) where id is consecutive (1,2,3...)",
+    "a": "-- Using LAG/LEAD window functions (most readable)\nSELECT DISTINCT num AS ConsecutiveNums\nFROM (\n  SELECT num,\n         LAG(num)  OVER (ORDER BY id) AS prev_num,\n         LEAD(num) OVER (ORDER BY id) AS next_num\n  FROM Logs\n) t\nWHERE num = prev_num AND num = next_num;\n\n-- Self-join approach (classic):\nSELECT DISTINCT l1.num AS ConsecutiveNums\nFROM Logs l1\nJOIN Logs l2 ON l1.id = l2.id - 1 AND l1.num = l2.num\nJOIN Logs l3 ON l1.id = l3.id - 2 AND l1.num = l3.num;\n\n-- Example data:\n-- id:1 num:1, id:2 num:1, id:3 num:1, id:4 num:2, id:5 num:1, id:6 num:2, id:7 num:2\n-- Result: 1 (appears consecutively at ids 1,2,3)"
+  },
+  {
+    "id": "dbc9",
+    "level": "intermediate",
+    "q": "Write a SQL query to find customers who have never ordered anything.\nTables: Customers(id, name), Orders(id, customerId)",
+    "a": "-- Method 1: LEFT JOIN + IS NULL (most common, most efficient)\nSELECT c.name AS Customers\nFROM Customers c\nLEFT JOIN Orders o ON c.id = o.customerId\nWHERE o.id IS NULL;\n\n-- Method 2: NOT EXISTS (often fastest, stops at first match)\nSELECT name\nFROM Customers c\nWHERE NOT EXISTS (\n  SELECT 1 FROM Orders o WHERE o.customerId = c.id\n);\n\n-- Method 3: NOT IN (watch out — fails if Orders has NULL customerId values!)\nSELECT name\nFROM Customers\nWHERE id NOT IN (\n  SELECT DISTINCT customerId FROM Orders WHERE customerId IS NOT NULL\n);\n\n-- Performance note:\n-- LEFT JOIN + IS NULL and NOT EXISTS are typically equivalent.\n-- NOT IN can be dangerous with NULLs — use with caution.\n-- For large tables, ensure customerId has an index."
+  },
+  {
+    "id": "dbc10",
+    "level": "intermediate",
+    "q": "Calculate the running total (cumulative sum) of sales per day.\nTable: Sales(sale_date, amount)",
+    "a": "-- Running total using SUM() window function\nSELECT\n  sale_date,\n  amount,\n  SUM(amount) OVER (ORDER BY sale_date) AS running_total\nFROM Sales\nORDER BY sale_date;\n\n-- Running total RESET per month:\nSELECT\n  sale_date,\n  amount,\n  SUM(amount) OVER (\n    PARTITION BY DATE_TRUNC('month', sale_date)\n    ORDER BY sale_date\n  ) AS monthly_running_total\nFROM Sales;\n\n-- With both daily and running total:\nSELECT\n  sale_date,\n  amount,\n  SUM(amount) OVER (ORDER BY sale_date\n    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative,\n  AVG(amount) OVER (ORDER BY sale_date\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS moving_avg_7day\nFROM Sales;\n\n-- ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW = default for running total\n-- ROWS BETWEEN 6 PRECEDING AND CURRENT ROW = 7-day moving average"
+  },
+  {
+    "id": "dbc11",
+    "level": "advanced",
+    "q": "Write a query to find employees whose salary is above the average salary of their respective department.\nTables: Employee(id, name, salary, departmentId)",
+    "a": "-- Method 1: Correlated subquery\nSELECT e.name, e.salary, e.departmentId\nFROM Employee e\nWHERE e.salary > (\n  SELECT AVG(salary)\n  FROM Employee\n  WHERE departmentId = e.departmentId\n);\n\n-- Method 2: JOIN with aggregation (usually more efficient)\nSELECT e.name, e.salary, e.departmentId\nFROM Employee e\nJOIN (\n  SELECT departmentId, AVG(salary) AS avg_sal\n  FROM Employee\n  GROUP BY departmentId\n) dept_avg ON e.departmentId = dept_avg.departmentId\nWHERE e.salary > dept_avg.avg_sal;\n\n-- Method 3: Window function (cleanest)\nSELECT name, salary, departmentId\nFROM (\n  SELECT name, salary, departmentId,\n         AVG(salary) OVER (PARTITION BY departmentId) AS dept_avg\n  FROM Employee\n) t\nWHERE salary > dept_avg;"
+  },
+  {
+    "id": "dbc12",
+    "level": "advanced",
+    "q": "Write a query to pivot data: show each department's total salary by year as columns.\nTable: Salaries(employee_id, department, year, salary)\nOutput: department | 2022 | 2023 | 2024",
+    "a": "-- PostgreSQL using conditional aggregation (most portable):\nSELECT\n  department,\n  SUM(CASE WHEN year = 2022 THEN salary ELSE 0 END) AS \"2022\",\n  SUM(CASE WHEN year = 2023 THEN salary ELSE 0 END) AS \"2023\",\n  SUM(CASE WHEN year = 2024 THEN salary ELSE 0 END) AS \"2024\"\nFROM Salaries\nGROUP BY department\nORDER BY department;\n\n-- Using FILTER (PostgreSQL syntax — cleaner):\nSELECT\n  department,\n  SUM(salary) FILTER (WHERE year = 2022) AS \"2022\",\n  SUM(salary) FILTER (WHERE year = 2023) AS \"2023\",\n  SUM(salary) FILTER (WHERE year = 2024) AS \"2024\"\nFROM Salaries\nGROUP BY department;\n\n-- SQL Server native PIVOT:\nSELECT department, [2022], [2023], [2024]\nFROM Salaries\nPIVOT (SUM(salary) FOR year IN ([2022],[2023],[2024])) AS pvt;\n\n-- Note: For dynamic years, you need dynamic SQL."
+  },
+  {
+    "id": "dbc13",
+    "level": "advanced",
+    "q": "Find gaps in a sequence of IDs.\nTable: Orders(id) — find missing IDs in the sequence from min to max.",
+    "a": "-- Method 1: Generate series + LEFT JOIN (PostgreSQL)\nSELECT gs.id AS missing_id\nFROM generate_series(\n  (SELECT MIN(id) FROM Orders),\n  (SELECT MAX(id) FROM Orders)\n) AS gs(id)\nLEFT JOIN Orders o ON gs.id = o.id\nWHERE o.id IS NULL;\n\n-- Method 2: Using LAG to find gaps\nSELECT id + 1 AS gap_start,\n       next_id - 1 AS gap_end\nFROM (\n  SELECT id, LEAD(id) OVER (ORDER BY id) AS next_id\n  FROM Orders\n) t\nWHERE next_id - id > 1;\n\n-- Method 3: Self-join (older approach)\nSELECT o1.id + 1 AS gap_start\nFROM Orders o1\nWHERE NOT EXISTS (\n  SELECT 1 FROM Orders o2 WHERE o2.id = o1.id + 1\n)\nAND o1.id < (SELECT MAX(id) FROM Orders);\n\n-- Output example for ids [1,2,4,7,8]:\n-- Gap: 3 (between 2 and 4), 5-6 (between 4 and 7)"
+  },
+  {
+    "id": "dbc14",
+    "level": "advanced",
+    "q": "Write a query to calculate the median salary from the Employee table.",
+    "a": "-- PostgreSQL has percentile_cont function (cleanest):\nSELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary) AS median_salary\nFROM Employee;\n\n-- Manual approach (works in most databases):\nSELECT AVG(salary) AS median_salary\nFROM (\n  SELECT salary,\n         ROW_NUMBER() OVER (ORDER BY salary) AS rn,\n         COUNT(*) OVER () AS total_count\n  FROM Employee\n) t\nWHERE rn IN (\n  FLOOR((total_count + 1) / 2.0),\n  CEIL((total_count + 1) / 2.0)\n);\n\n-- Explanation:\n-- For odd count (5): median is row 3\n-- For even count (6): median is average of rows 3 and 4\n-- FLOOR((6+1)/2) = 3, CEIL((6+1)/2) = 4 → AVG of those two rows\n\n-- SQL Server: Use PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary) OVER ()"
+  },
+  {
+    "id": "dbc15",
+    "level": "advanced",
+    "q": "Write a query to find the most recent order for each customer.\nTables: Customers(id, name), Orders(id, customer_id, order_date, amount)",
+    "a": "-- Method 1: ROW_NUMBER (most flexible — can get top N)\nSELECT customer_id, order_date, amount, id AS order_id\nFROM (\n  SELECT *,\n         ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) AS rn\n  FROM Orders\n) ranked\nWHERE rn = 1;\n\n-- Method 2: JOIN with subquery aggregation (classic)\nSELECT o.*\nFROM Orders o\nJOIN (\n  SELECT customer_id, MAX(order_date) AS latest\n  FROM Orders GROUP BY customer_id\n) latest ON o.customer_id = latest.customer_id AND o.order_date = latest.latest;\n-- Warning: Ties (same date) return multiple rows — ROW_NUMBER avoids this.\n\n-- Method 3: DISTINCT ON (PostgreSQL-specific, elegant)\nSELECT DISTINCT ON (customer_id)\n  customer_id, order_date, amount\nFROM Orders\nORDER BY customer_id, order_date DESC;\n-- PostgreSQL keeps the FIRST row per partition after ordering.\n\n-- Join with customer name:\nSELECT c.name, o.order_date, o.amount\nFROM Customers c\nJOIN (\n  SELECT DISTINCT ON (customer_id) * FROM Orders ORDER BY customer_id, order_date DESC\n) o ON c.id = o.customer_id;"
+  },
+  {
+    "id": "dbc16",
+    "level": "advanced",
+    "q": "Write a query to find students who scored above average in every subject they enrolled in.\nTables: Students(id, name), Enrollments(student_id, subject, score)",
+    "a": "-- Find avg score per subject, then find students who beat it in ALL their subjects\n\n-- Using NOT EXISTS (elegant — \"no subject where score <= avg\"):\nSELECT DISTINCT s.name\nFROM Students s\nJOIN Enrollments e ON s.id = e.student_id\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM Enrollments e2\n  WHERE e2.student_id = s.id\n    AND e2.score <= (\n      SELECT AVG(score) FROM Enrollments WHERE subject = e2.subject\n    )\n);\n\n-- Using HAVING COUNT comparison:\nSELECT s.name\nFROM Students s\nJOIN Enrollments e ON s.id = e.student_id\nJOIN (\n  SELECT subject, AVG(score) AS avg_score FROM Enrollments GROUP BY subject\n) subj_avg ON e.subject = subj_avg.subject\nGROUP BY s.id, s.name\nHAVING COUNT(*) = SUM(CASE WHEN e.score > subj_avg.avg_score THEN 1 ELSE 0 END);\n-- Count all subjects = count where above average → true for all subjects"
+  },
+  {
+    "id": "dbc17",
+    "level": "advanced",
+    "q": "Calculate the 7-day moving average of daily sales.\nTable: DailySales(sale_date DATE, revenue DECIMAL)",
+    "a": "-- Using window function with ROWS frame:\nSELECT\n  sale_date,\n  revenue,\n  AVG(revenue) OVER (\n    ORDER BY sale_date\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS moving_avg_7day,\n  COUNT(*) OVER (\n    ORDER BY sale_date\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS days_included  -- shows how many days in window (< 7 at start)\nFROM DailySales\nORDER BY sale_date;\n\n-- Handle missing dates (fill gaps first with generate_series):\nWITH all_dates AS (\n  SELECT gs::date AS sale_date\n  FROM generate_series('2024-01-01'::date, '2024-12-31'::date, '1 day') gs\n),\nfilled AS (\n  SELECT a.sale_date, COALESCE(d.revenue, 0) AS revenue\n  FROM all_dates a LEFT JOIN DailySales d ON a.sale_date = d.sale_date\n)\nSELECT sale_date, revenue,\n       AVG(revenue) OVER (ORDER BY sale_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS moving_avg\nFROM filled;"
+  },
+  {
+    "id": "dbc18",
+    "level": "expert",
+    "q": "Write a recursive CTE to display an organizational hierarchy (manager → employees tree).\nTable: Employee(id, name, manager_id) — manager_id is NULL for CEO.",
+    "a": "WITH RECURSIVE OrgChart AS (\n  -- Anchor: Start with the CEO (no manager)\n  SELECT\n    id,\n    name,\n    manager_id,\n    0 AS level,\n    name::TEXT AS path,\n    ARRAY[id] AS id_path\n  FROM Employee\n  WHERE manager_id IS NULL\n\n  UNION ALL\n\n  -- Recursive: Join each employee with their manager\n  SELECT\n    e.id,\n    e.name,\n    e.manager_id,\n    o.level + 1,\n    (o.path || ' > ' || e.name)::TEXT,\n    o.id_path || e.id\n  FROM Employee e\n  JOIN OrgChart o ON e.manager_id = o.id\n  WHERE NOT (e.id = ANY(o.id_path))  -- prevent infinite loops on cyclic data\n)\nSELECT\n  REPEAT('  ', level) || name AS hierarchy,\n  level,\n  path\nFROM OrgChart\nORDER BY id_path;\n\n-- Output example:\n-- CEO (level 0)\n--   VP Engineering (level 1)\n--     Senior Dev (level 2)\n--       Junior Dev (level 3)\n--   VP Sales (level 1)\n\n-- MAX depth guard: Add MAXRECURSION 100 (SQL Server) or check cycle manually."
+  },
+  {
+    "id": "dbc19",
+    "level": "expert",
+    "q": "Write a query to find users who logged in for 3 or more consecutive days.\nTable: UserLogins(user_id, login_date) — one row per login, no duplicates per day.",
+    "a": "-- Step 1: Assign row numbers per user ordered by date\n-- Step 2: Subtract row number from date — creates same \"group date\" for consecutive days\n\nWITH consecutive AS (\n  SELECT\n    user_id,\n    login_date,\n    ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date) AS rn,\n    login_date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date))::INT AS grp\n    -- If consecutive: login_date - rn is constant for each consecutive streak\n  FROM UserLogins\n),\nstreaks AS (\n  SELECT\n    user_id,\n    grp,\n    MIN(login_date) AS streak_start,\n    MAX(login_date) AS streak_end,\n    COUNT(*) AS streak_length\n  FROM consecutive\n  GROUP BY user_id, grp\n)\nSELECT DISTINCT user_id, streak_start, streak_end, streak_length\nFROM streaks\nWHERE streak_length >= 3\nORDER BY user_id, streak_start;\n\n-- Key insight: For consecutive dates, (date - row_number) is constant.\n-- [Jan 1, Jan 2, Jan 3] with rn [1,2,3] → grp [Dec 31, Dec 31, Dec 31] — all same!\n-- Gap breaks the pattern."
+  },
+  {
+    "id": "dbc20",
+    "level": "expert",
+    "q": "Design and write a query for a leaderboard: rank users by total score, show their rank, percentile, and how far they are from the next rank.\nTable: UserScores(user_id, username, score)",
+    "a": "SELECT\n  user_id,\n  username,\n  score,\n  RANK()          OVER (ORDER BY score DESC) AS rank,\n  DENSE_RANK()    OVER (ORDER BY score DESC) AS dense_rank,\n  ROW_NUMBER()    OVER (ORDER BY score DESC) AS position,\n\n  -- Percentile: what % of users score <= this user\n  ROUND(\n    PERCENT_RANK() OVER (ORDER BY score) * 100, 1\n  ) AS percentile,\n\n  -- Gap to next rank above (how many points needed to overtake)\n  COALESCE(\n    LAG(score) OVER (ORDER BY score DESC) - score,\n    0\n  ) AS points_to_next_rank,\n\n  -- Gap to leader\n  FIRST_VALUE(score) OVER (ORDER BY score DESC) - score AS points_behind_leader,\n\n  -- Total users\n  COUNT(*) OVER () AS total_users\n\nFROM UserScores\nORDER BY score DESC;\n\n-- RANK: 1,1,3 (skips on ties)\n-- DENSE_RANK: 1,1,2 (no skips)\n-- ROW_NUMBER: 1,2,3 (always unique — arbitrary tie-breaking)\n-- PERCENT_RANK: 0 = lowest, 1 = highest. (rank-1)/(count-1)\n-- Use DENSE_RANK for leaderboards to avoid confusion with gaps."
+  }
+]

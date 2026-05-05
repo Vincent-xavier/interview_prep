@@ -1,0 +1,62 @@
+[
+  {
+    "id": "sd1",
+    "level": "intermediate",
+    "q": "Design a URL shortener (like bit.ly). Cover key components.",
+    "a": "Requirements: Shorten long URL → short code, redirect, handle millions of URLs.\n\n1. Short code generation:\n   Base62 (a-zA-Z0-9) encoding of a counter. 7 chars = 62^7 ≈ 3.5 trillion unique codes.\n   Or MD5 hash → first 7 chars (collision risk); or Snowflake ID → base62.\n\n2. Database: short_code → { original_url, user_id, created_at, expires_at }\n   Redis for hot URLs (cache read-through) + PostgreSQL for persistence.\n\n3. Read path (high traffic):\n   Short URL → API Gateway → Redis cache → if miss → DB → 301/302 redirect.\n   301: Permanent (browser caches → fewer server hits, less analytics).\n   302: Temporary (every redirect hits server → better analytics).\n\n4. Scale:\n   Read replicas, distributed counter with pre-allocated ID ranges, CDN for redirect caching.\n\n5. Analytics: Async event (click, UA, timestamp) → Kafka → ClickHouse for aggregation.\n\n6. Features: Custom aliases, expiration TTL, rate limiting per user."
+  },
+  {
+    "id": "sd2",
+    "level": "intermediate",
+    "q": "Design a rate limiter. What algorithms are commonly used?",
+    "a": "Algorithms:\n\n1. Fixed Window Counter: Count requests per window. Simple but burst at boundary (200 req in 2s spanning two 1-min windows).\n   Redis: INCR key → EXPIRE 60 → if > limit, reject.\n\n2. Sliding Window Log: Store timestamps in sorted set, remove old, count remaining. Accurate but memory-heavy.\n\n3. Sliding Window Counter: Interpolate between prev/curr window counts. Most practical.\n   count = prev × (1 - elapsed/window) + current\n\n4. Token Bucket: Bucket holds N tokens, refills at rate R/sec. Allows controlled bursting.\n\n5. Leaky Bucket: Queue requests, process at fixed rate. Smooths output — no bursting.\n\nRedis implementation:\n  ZADD user:{id}:window {timestamp} {requestId}\n  ZREMRANGEBYSCORE ... 0 {timestamp - windowMs}\n  ZCARD ... → compare to limit\n\nDistributed: Centralized Redis (consistent) or per-node with sync (eventual consistency)."
+  },
+  {
+    "id": "sd3",
+    "level": "advanced",
+    "q": "How would you design a real-time chat application (like Slack)?",
+    "a": "1. WebSocket Gateway:\n   Persistent WebSocket per user session.\n   Scale-out: Redis Pub/Sub backplane — server A receives message → publish to Redis → all servers push to clients.\n\n2. Message Service: POST /channels/{id}/messages → validate → persist → publish to queue.\n\n3. Storage:\n   PostgreSQL: Channel metadata, memberships.\n   Cassandra or TimescaleDB: Message history (time-series, append-heavy).\n   Schema: (channel_id, message_id UUID, sender_id, content, created_at)\n\n4. Fan-out: Notify all online channel members via WebSocket. Offline → store unread count in Redis.\n\n5. Presence: User heartbeat every 30s → Redis TTL key. Presence server broadcasts online/offline.\n\n6. Delivery guarantees: Client acks message receipt. Server persists before ack. Retry on reconnect.\n\n7. Search: Elasticsearch for full-text message search.\n\n8. Scale: 1M concurrent WebSocket connections → multiple gateway servers + Redis backplane."
+  },
+  {
+    "id": "sd4",
+    "level": "advanced",
+    "q": "Explain the CAP theorem, BASE vs ACID, and how they affect distributed system design.",
+    "a": "CAP: In a distributed system, guarantee at most 2 of:\n  C (Consistency): All nodes see same data simultaneously.\n  A (Availability): Every request gets a response.\n  P (Partition Tolerance): Works despite network partitions.\n\nSince partitions are a given → choose CP or AP:\n  CP: Consistent but may be unavailable during partition. ZooKeeper, MongoDB (strong mode).\n  AP: Available but may return stale data. Cassandra, DynamoDB.\n\nACID (traditional RDBMS):\n  Atomicity, Consistency, Isolation, Durability — strong guarantees.\n\nBASE (NoSQL/distributed):\n  Basically Available, Soft state, Eventually Consistent — relaxed guarantees for availability.\n\nDesign decisions:\n  Financial transactions → CP/ACID (strong consistency required).\n  Social media feeds → AP/BASE (slight staleness acceptable).\n  Inventory → CP (prevent overselling).\n  Shopping cart → AP (merge conflicts on reconciliation)."
+  },
+  {
+    "id": "sd5",
+    "level": "advanced",
+    "q": "Design a distributed job scheduler (like Hangfire at scale).",
+    "a": "Components:\n\n1. Job Store (PostgreSQL):\n   jobs(id, type, payload, status, run_at, attempts, max_attempts, worker_id, locked_until)\n\n2. Worker pickup using SKIP LOCKED (prevents duplicate processing):\n   SELECT * FROM jobs WHERE status='pending' AND run_at<=now()\n   FOR UPDATE SKIP LOCKED LIMIT 10;\n\n3. Heartbeat: Worker updates locked_until every 30s. Expired locks → reassigned.\n\n4. Retry: On failure, increment attempts. If < max: status='pending', run_at = now + exponential_backoff.\n\n5. Recurring jobs: Cron expression table. Scheduler calculates next_run_at, inserts job record.\n\n6. Scale-out: Multiple schedulers use SKIP LOCKED (DB deduplication — no leader election needed).\n\n7. Outbox pattern: Ensure job creation is atomic with business transaction.\n\n8. Dashboard: Job status, failure rates, dead-letter queue, retry control."
+  },
+  {
+    "id": "sd6",
+    "level": "advanced",
+    "q": "Design a leaderboard with real-time rankings for millions of players.",
+    "a": "Redis Sorted Set (perfect data structure):\n  ZADD leaderboard {score} {player_id}    // O(log N)\n  ZREVRANK leaderboard {player_id}         // rank from top O(log N)\n  ZREVRANGE leaderboard 0 9 WITHSCORES    // top 10\n\nArchitecture:\n1. Score updates: API → Kafka → Worker → ZADD Redis + UPDATE PostgreSQL.\n   Kafka handles burst writes; worker processes serially per player.\n\n2. Sharding for billions:\n   Sample-based rank (approximate global rank, accurate enough).\n   Or partition by score range: shard_A handles 0-1M score, etc.\n\n3. Persistence: Redis primary for reads; PostgreSQL source of truth.\n   Scheduled job reconciles daily.\n\n4. Friends leaderboard: Per-user sorted set (ZADD user_{id}_friends_lb).\n   Updated when any friend's score changes.\n\n5. Real-time: Push rank changes via WebSocket/SSE to active players.\n\n6. Historical: Cron job snapshots Redis sorted set → DB for season/weekly leaderboards."
+  },
+  {
+    "id": "sd7",
+    "level": "advanced",
+    "q": "What is the Outbox Pattern? Why is it needed for reliable event publishing?",
+    "a": "Problem (dual-write): When a service needs to update the DB AND publish an event, both must happen atomically. If the service crashes between the two operations, they become inconsistent.\n\n  // WRONG — not atomic:\n  await db.SaveChangesAsync();   // succeeds\n  await bus.PublishAsync(event); // crashes → event never published!\n\nOutbox Pattern:\n  // Write to outbox table IN THE SAME DB TRANSACTION as business data:\n  BEGIN;\n    UPDATE orders SET status = 'confirmed';\n    INSERT INTO outbox (id, type, payload, created_at, sent) VALUES (..., false);\n  COMMIT; // atomic — either both succeed or neither does\n\n  // Separate Outbox Poller (background service):\n  SELECT * FROM outbox WHERE sent = false ORDER BY created_at LIMIT 100;\n  // For each: publish to message bus → mark sent = true.\n\nBenefits:\n  - At-least-once delivery guaranteed (idempotent consumers handle duplicates).\n  - No distributed transaction needed.\n  - Business logic and event publishing are decoupled.\n\nImplementations: Debezium (CDC), MassTransit Outbox, NServiceBus, custom Hangfire poller."
+  },
+  {
+    "id": "sd8",
+    "level": "expert",
+    "q": "Design a system to process 1 million payment transactions per day reliably.",
+    "a": "1M/day = ~12/sec avg, ~100/sec peak.\n\nRequirements: Exactly-once processing, ACID, idempotency, audit trail.\n\n1. API: POST /payments → validate → generate idempotency_key → publish to Kafka → return 202.\n\n2. Kafka: Partitioned by merchant_id (ordered per merchant, parallel across merchants).\n\n3. Payment Processor Worker:\n   - Consume Kafka.\n   - Idempotency: INSERT INTO processed_events(key) ON CONFLICT DO NOTHING.\n   - Call payment gateway with idempotency key.\n   - DB transaction: UPDATE payment + INSERT ledger_entry + INSERT outbox_event.\n\n4. Outbox: Publish PaymentCompleted event after successful DB commit.\n\n5. Compensating transactions: If gateway times out, query gateway for status before retrying.\n\n6. Reconciliation: Daily job compares Kafka events vs gateway records vs DB.\n\n7. Monitoring: Processing lag, error rate, p99 latency, failed payment alerts.\n\n8. Disaster recovery: Multi-region PostgreSQL (Patroni), Kafka MirrorMaker."
+  },
+  {
+    "id": "sd9",
+    "level": "expert",
+    "q": "How do you design for 99.99% (four nines) availability?",
+    "a": "99.99% = 52.6 minutes downtime per YEAR.\n\nPillars:\n\n1. No single points of failure:\n   Multiple API instances + load balancer. DB primary + replicas + auto-failover. Redis Sentinel/Cluster.\n\n2. Geographic redundancy:\n   Deploy in 2+ regions. Active-active or active-passive. Global load balancer (Cloudflare, Azure Front Door).\n\n3. Circuit breakers (Polly): Detect failing dependencies fast → fail-fast → fallback.\n\n4. Graceful degradation: Recommendation fails → serve generic. Payment slow → show queue message.\n\n5. Health checks + auto-healing: Kubernetes liveness/readiness probes. Auto-scaling groups replace failed instances.\n\n6. Zero-downtime deployments: Blue-green or canary. DB migrations backward-compatible (expand/contract).\n\n7. Chaos engineering: Kill instances proactively (Chaos Monkey) to validate resilience.\n\n8. Monitoring + alerting: SLO tracking, p99 latency alerts, error rate alerts, on-call runbooks.\n\n9. RTO/RPO: Define Recovery Time Objective and Recovery Point Objective. Test failover regularly."
+  },
+  {
+    "id": "sd10",
+    "level": "advanced",
+    "q": "Explain distributed caching strategies and cache eviction policies.",
+    "a": "Caching patterns:\n\nCache-aside (most common): App checks cache → miss → load from DB → write cache.\nWrite-through: Write to cache AND DB synchronously. Always fresh, higher write latency.\nWrite-behind: Write cache → async write to DB. Fast writes, risk of data loss.\nRead-through: Cache fetches from DB on miss automatically.\n\nEviction Policies:\n- LRU (Least Recently Used): Evict not-accessed-longest. Redis default.\n- LFU (Least Frequently Used): Evict lowest access frequency. Good for Zipfian distribution.\n- TTL: Items expire after set time.\n\nCache stampede (thundering herd):\n  Many requests miss cache simultaneously → all hit DB.\n  Fix: Probabilistic early expiration, mutex lock on miss, request coalescing.\n\nCache invalidation strategies:\n  Event-driven: DB change → publish event → invalidate cache key.\n  TTL-based: Accept eventual consistency with short TTL.\n  Version key: Include version in cache key — increment version → old keys expire naturally.\n\nRedis Cluster: Horizontal scaling. 16384 hash slots distributed across nodes. Keys mapped by CRC16(key) % 16384."
+  }
+]

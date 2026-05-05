@@ -9,11 +9,11 @@ const LEVELS: { value: DiffFilter; label: string; cls: string }[] = [
 ];
 
 const STATUSES: { value: StatusFilter; label: string; cls: string }[] = [
-  { value: 'all',     label: 'All',       cls: '' },
-  { value: 'unseen',  label: 'Unseen',    cls: '' },
-  { value: 'correct', label: '✓ Correct', cls: 'correct' },
-  { value: 'wrong',   label: '✗ Wrong',   cls: 'wrong' },
-  { value: 'skipped', label: '→ Skipped', cls: 'skipped' },
+  { value: 'all',     label: 'All',           cls: '' },
+  { value: 'unseen',  label: 'Unseen',        cls: '' },
+  { value: 'correct', label: '✓ Know it',     cls: 'correct' },
+  { value: 'wrong',   label: '✗ Review',     cls: 'wrong' },
+  { value: 'skipped', label: '→ Skipped',     cls: 'skipped' },
 ];
 
 interface Props {
@@ -47,6 +47,7 @@ export default function FilterBar({ diffFilter, statusFilter, search, filteredCo
         <div className="chips">
           {STATUSES.map(s => (
             <button
+              type="button"
               key={s.value}
               className={`chip ${s.cls} ${statusFilter === s.value ? 'active' : ''}`}
               onClick={() => onStatus(s.value)}
@@ -56,7 +57,8 @@ export default function FilterBar({ diffFilter, statusFilter, search, filteredCo
       </div>
       <input
         className="search-input"
-        placeholder="🔍 Search questions..."
+        placeholder="🔍 Search questions, answers, tips…"
+        aria-label="Search questions and answers"
         value={search}
         onChange={e => onSearch(e.target.value)}
       />

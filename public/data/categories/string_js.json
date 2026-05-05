@@ -1,0 +1,122 @@
+[
+  {
+    "id": "sj1",
+    "level": "beginner",
+    "q": "Reverse a string without using built-in reverse().\nExample: \"hello\" → \"olleh\"",
+    "a": "// Method 1: Loop\nfunction reverseString(str) {\n  let result = '';\n  for (let i = str.length - 1; i >= 0; i--) {\n    result += str[i];\n  }\n  return result;\n}\n\n// Method 2: Two pointers on array\nfunction reverseString2(str) {\n  const arr = str.split('');\n  let l = 0, r = arr.length - 1;\n  while (l < r) {\n    [arr[l], arr[r]] = [arr[r], arr[l]];\n    l++; r--;\n  }\n  return arr.join('');\n}\n\n// Method 3: Spread + reduce\nconst reverse = str => [...str].reduce((acc, c) => c + acc, '');\n\nconsole.log(reverseString(\"hello\")); // \"olleh\""
+  },
+  {
+    "id": "sj2",
+    "level": "beginner",
+    "q": "Check if a string is a palindrome.\nExample: \"racecar\" → true, \"hello\" → false",
+    "a": "// Method 1: Compare with reverse\nfunction isPalindrome(str) {\n  const clean = str.toLowerCase().replace(/[^a-z0-9]/g, '');\n  return clean === [...clean].reverse().join('');\n}\n\n// Method 2: Two pointers (O(n) time, O(1) space)\nfunction isPalindrome2(str) {\n  const s = str.toLowerCase().replace(/[^a-z0-9]/g, '');\n  let l = 0, r = s.length - 1;\n  while (l < r) {\n    if (s[l] !== s[r]) return false;\n    l++; r--;\n  }\n  return true;\n}\n\nisPalindrome(\"A man, a plan, a canal: Panama\"); // true\nisPalindrome(\"racecar\"); // true"
+  },
+  {
+    "id": "sj3",
+    "level": "beginner",
+    "q": "Count the occurrence of each character in a string.\nExample: \"hello\" → { h:1, e:1, l:2, o:1 }",
+    "a": "function charCount(str) {\n  const count = {};\n  for (const char of str) {\n    count[char] = (count[char] || 0) + 1;\n  }\n  return count;\n}\n\n// Using reduce:\nconst charCount2 = str =>\n  [...str].reduce((acc, c) => ({ ...acc, [c]: (acc[c] || 0) + 1 }), {});\n\n// ES2022 Map approach (preserves insertion order):\nfunction charCountMap(str) {\n  const map = new Map();\n  for (const c of str) map.set(c, (map.get(c) || 0) + 1);\n  return map;\n}\n\ncharCount(\"hello\"); // { h:1, e:1, l:2, o:1 }"
+  },
+  {
+    "id": "sj4",
+    "level": "beginner",
+    "q": "Check if two strings are anagrams.\nExample: \"listen\" and \"silent\" → true",
+    "a": "// Method 1: Sort both strings and compare\nfunction isAnagram(s1, s2) {\n  if (s1.length !== s2.length) return false;\n  const sort = s => s.toLowerCase().split('').sort().join('');\n  return sort(s1) === sort(s2);\n}\n\n// Method 2: Character frequency map (O(n), better)\nfunction isAnagram2(s1, s2) {\n  if (s1.length !== s2.length) return false;\n  const count = {};\n  for (const c of s1) count[c] = (count[c] || 0) + 1;\n  for (const c of s2) {\n    if (!count[c]) return false;\n    count[c]--;\n  }\n  return true;\n}\n\nisAnagram(\"listen\", \"silent\"); // true\nisAnagram(\"hello\", \"world\");   // false"
+  },
+  {
+    "id": "sj5",
+    "level": "intermediate",
+    "q": "Find all unique permutations of a string.\nExample: \"abc\" → [\"abc\",\"acb\",\"bac\",\"bca\",\"cab\",\"cba\"]",
+    "a": "function permutations(str) {\n  const result = [];\n  \n  function permute(current, remaining) {\n    if (remaining.length === 0) {\n      result.push(current);\n      return;\n    }\n    const seen = new Set();\n    for (let i = 0; i < remaining.length; i++) {\n      const char = remaining[i];\n      if (seen.has(char)) continue; // skip duplicates\n      seen.add(char);\n      permute(\n        current + char,\n        remaining.slice(0, i) + remaining.slice(i + 1)\n      );\n    }\n  }\n  \n  permute('', str);\n  return result;\n}\n\npermutations(\"abc\").length; // 6\npermutations(\"aab\").length; // 3 (unique)"
+  },
+  {
+    "id": "sj6",
+    "level": "intermediate",
+    "q": "Find the longest substring without repeating characters.\nExample: \"abcabcbb\" → 3 (\"abc\")",
+    "a": "// Sliding window approach — O(n)\nfunction lengthOfLongestSubstring(s) {\n  const seen = new Map(); // char → last index\n  let maxLen = 0;\n  let left = 0;\n  \n  for (let right = 0; right < s.length; right++) {\n    const char = s[right];\n    \n    // If char was seen and is within current window\n    if (seen.has(char) && seen.get(char) >= left) {\n      left = seen.get(char) + 1; // shrink window from left\n    }\n    \n    seen.set(char, right);\n    maxLen = Math.max(maxLen, right - left + 1);\n  }\n  \n  return maxLen;\n}\n\nlengthOfLongestSubstring(\"abcabcbb\"); // 3\nlengthOfLongestSubstring(\"pwwkew\");   // 3 (\"wke\")\nlengthOfLongestSubstring(\"bbbbb\");    // 1"
+  },
+  {
+    "id": "sj7",
+    "level": "intermediate",
+    "q": "Implement a function to check if parentheses, brackets, and braces are balanced.\nExample: \"{[()]}\" → true, \"{[(])}\" → false",
+    "a": "function isBalanced(str) {\n  const stack = [];\n  const pairs = { ')': '(', ']': '[', '}': '{' };\n  const open = new Set(['(', '[', '{']);\n  \n  for (const char of str) {\n    if (open.has(char)) {\n      stack.push(char);\n    } else if (pairs[char]) {\n      if (stack.pop() !== pairs[char]) return false;\n    }\n  }\n  \n  return stack.length === 0;\n}\n\nisBalanced(\"{[()]}\");  // true\nisBalanced(\"{[(])}\");  // false\nisBalanced(\"((()))\");  // true\nisBalanced(\"(\");       // false"
+  },
+  {
+    "id": "sj8",
+    "level": "intermediate",
+    "q": "Convert a string to camelCase.\nExample: \"hello world foo\" → \"helloWorldFoo\", \"hello-world\" → \"helloWorld\"",
+    "a": "function toCamelCase(str) {\n  return str\n    .toLowerCase()\n    .replace(/[-_s]+(.)/g, (_, char) => char.toUpperCase());\n}\n\n// More explicit version:\nfunction toCamelCase2(str) {\n  const words = str.split(/[-_s]+/);\n  return words[0].toLowerCase() +\n    words.slice(1).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join('');\n}\n\ntoCamelCase(\"hello world foo\"); // \"helloWorldFoo\"\ntoCamelCase(\"hello-world\");     // \"helloWorld\"\ntoCamelCase(\"HELLO_WORLD\");     // \"helloWorld\""
+  },
+  {
+    "id": "sj9",
+    "level": "intermediate",
+    "q": "Find the first non-repeating character in a string.\nExample: \"leetcode\" → \"l\", \"aabb\" → \"\"",
+    "a": "// O(n) — two passes\nfunction firstNonRepeating(str) {\n  const count = {};\n  for (const c of str) count[c] = (count[c] || 0) + 1;\n  for (const c of str) if (count[c] === 1) return c;\n  return '';\n}\n\n// Using Map (preserves insertion order):\nfunction firstNonRepeating2(str) {\n  const map = new Map();\n  for (const c of str) map.set(c, (map.get(c) || 0) + 1);\n  for (const [char, count] of map) if (count === 1) return char;\n  return '';\n}\n\nfirstNonRepeating(\"leetcode\"); // \"l\"\nfirstNonRepeating(\"loveleetcode\"); // \"v\"\nfirstNonRepeating(\"aabb\"); // \"\""
+  },
+  {
+    "id": "sj10",
+    "level": "advanced",
+    "q": "Implement a basic string compression.\nExample: \"aabcccdddd\" → \"a2b1c3d4\". If compressed is longer, return original.",
+    "a": "function compress(str) {\n  if (!str.length) return str;\n  \n  let result = '';\n  let count = 1;\n  \n  for (let i = 1; i <= str.length; i++) {\n    if (i < str.length && str[i] === str[i - 1]) {\n      count++;\n    } else {\n      result += str[i - 1] + count;\n      count = 1;\n    }\n  }\n  \n  return result.length < str.length ? result : str;\n}\n\ncompress(\"aabcccdddd\"); // \"a2b1c3d4\"\ncompress(\"abcd\");       // \"abcd\" (compressed would be longer)\ncompress(\"aaaa\");       // \"a4\""
+  },
+  {
+    "id": "sj11",
+    "level": "advanced",
+    "q": "Find all substrings that are palindromes.\nExample: \"aab\" → [\"a\",\"a\",\"aa\",\"b\"]",
+    "a": "// Expand around center approach\nfunction palindromicSubstrings(s) {\n  const result = [];\n  \n  function expand(left, right) {\n    while (left >= 0 && right < s.length && s[left] === s[right]) {\n      result.push(s.slice(left, right + 1));\n      left--;\n      right++;\n    }\n  }\n  \n  for (let i = 0; i < s.length; i++) {\n    expand(i, i);     // odd-length palindromes\n    expand(i, i + 1); // even-length palindromes\n  }\n  \n  return result.sort();\n}\n\n// Just count (LeetCode 647):\nfunction countPalindromicSubstrings(s) {\n  let count = 0;\n  const expand = (l, r) => { while (l >= 0 && r < s.length && s[l] === s[r]) { count++; l--; r++; } };\n  for (let i = 0; i < s.length; i++) { expand(i, i); expand(i, i+1); }\n  return count;\n}\n\npalindromicSubstrings(\"aab\"); // [\"a\",\"a\",\"aa\",\"b\"]"
+  },
+  {
+    "id": "sj12",
+    "level": "advanced",
+    "q": "Implement a function to find the longest common prefix of an array of strings.\nExample: [\"flower\",\"flow\",\"flight\"] → \"fl\"",
+    "a": "// Sort + compare first and last\nfunction longestCommonPrefix(strs) {\n  if (!strs.length) return '';\n  strs.sort();\n  const first = strs[0];\n  const last = strs[strs.length - 1];\n  let i = 0;\n  while (i < first.length && first[i] === last[i]) i++;\n  return first.slice(0, i);\n}\n\n// Alternative: Vertical scanning\nfunction longestCommonPrefix2(strs) {\n  if (!strs.length) return '';\n  for (let i = 0; i < strs[0].length; i++) {\n    const char = strs[0][i];\n    for (let j = 1; j < strs.length; j++) {\n      if (strs[j][i] !== char) return strs[0].slice(0, i);\n    }\n  }\n  return strs[0];\n}\n\nlongestCommonPrefix([\"flower\",\"flow\",\"flight\"]); // \"fl\"\nlongestCommonPrefix([\"dog\",\"racecar\",\"car\"]);     // \"\""
+  },
+  {
+    "id": "sj13",
+    "level": "advanced",
+    "q": "Given a string, find all words that can be formed using only unique characters (no repeats).\nWrite a function: uniqueCharWords(sentence)",
+    "a": "function uniqueCharWords(sentence) {\n  return sentence.split(' ').filter(word => {\n    const lower = word.toLowerCase().replace(/[^a-z]/g, '');\n    return new Set(lower).size === lower.length;\n  });\n}\n\n// Checking unique chars without Set:\nfunction hasAllUnique(word) {\n  const seen = {};\n  for (const c of word) {\n    if (seen[c]) return false;\n    seen[c] = true;\n  }\n  return true;\n}\n\nfunction uniqueCharWords2(sentence) {\n  return sentence.split(' ').filter(hasAllUnique);\n}\n\nuniqueCharWords(\"Hello world cat\"); // [\"world\", \"cat\"]\n// \"Hello\" has repeated 'l', so excluded."
+  },
+  {
+    "id": "sj14",
+    "level": "advanced",
+    "q": "Implement atoi (string to integer) — handle sign, whitespace, overflow, non-numeric chars.",
+    "a": "function myAtoi(str) {\n  const INT_MAX = 2 ** 31 - 1;  // 2147483647\n  const INT_MIN = -(2 ** 31);   // -2147483648\n  \n  let i = 0;\n  // Step 1: Skip leading whitespace\n  while (i < str.length && str[i] === ' ') i++;\n  \n  // Step 2: Handle sign\n  let sign = 1;\n  if (str[i] === '+') { i++; }\n  else if (str[i] === '-') { sign = -1; i++; }\n  \n  // Step 3: Read digits\n  let result = 0;\n  while (i < str.length && str[i] >= '0' && str[i] <= '9') {\n    result = result * 10 + (str[i].charCodeAt(0) - 48);\n    i++;\n    // Early overflow check\n    if (result * sign > INT_MAX) return INT_MAX;\n    if (result * sign < INT_MIN) return INT_MIN;\n  }\n  \n  return Math.max(INT_MIN, Math.min(INT_MAX, result * sign));\n}\n\nmyAtoi(\"  -42\");     // -42\nmyAtoi(\"4193words\"); // 4193\nmyAtoi(\"words123\");  // 0"
+  },
+  {
+    "id": "sj15",
+    "level": "expert",
+    "q": "Implement a function to find the minimum window substring.\nGiven s=\"ADOBECODEBANC\", t=\"ABC\" → return \"BANC\"",
+    "a": "// Sliding window — O(n)\nfunction minWindow(s, t) {\n  const need = {};\n  for (const c of t) need[c] = (need[c] || 0) + 1;\n  \n  let have = 0, required = Object.keys(need).length;\n  let left = 0, minLen = Infinity, minStart = 0;\n  const window = {};\n  \n  for (let right = 0; right < s.length; right++) {\n    const c = s[right];\n    window[c] = (window[c] || 0) + 1;\n    \n    if (need[c] && window[c] === need[c]) have++;\n    \n    // Shrink window from left when we have all required chars\n    while (have === required) {\n      if (right - left + 1 < minLen) {\n        minLen = right - left + 1;\n        minStart = left;\n      }\n      window[s[left]]--;\n      if (need[s[left]] && window[s[left]] < need[s[left]]) have--;\n      left++;\n    }\n  }\n  \n  return minLen === Infinity ? '' : s.slice(minStart, minStart + minLen);\n}\n\nminWindow(\"ADOBECODEBANC\", \"ABC\"); // \"BANC\"\nminWindow(\"a\", \"a\");               // \"a\"\nminWindow(\"a\", \"aa\");              // \"\""
+  },
+  {
+    "id": "sj16",
+    "level": "expert",
+    "q": "Implement wildcard pattern matching: \"?\" matches any single char, \"*\" matches any sequence.\nExample: s=\"adceb\", p=\"*a*b\" → true",
+    "a": "// Dynamic programming — O(m*n)\nfunction isMatch(s, p) {\n  const m = s.length, n = p.length;\n  // dp[i][j] = does s[0..i-1] match p[0..j-1]?\n  const dp = Array.from({length: m+1}, () => new Array(n+1).fill(false));\n  dp[0][0] = true;\n  \n  // Handle patterns like \"***\" matching empty string\n  for (let j = 1; j <= n; j++) {\n    if (p[j-1] === '*') dp[0][j] = dp[0][j-1];\n  }\n  \n  for (let i = 1; i <= m; i++) {\n    for (let j = 1; j <= n; j++) {\n      if (p[j-1] === '*') {\n        dp[i][j] = dp[i-1][j] || dp[i][j-1];\n        // dp[i-1][j]: * matches one char\n        // dp[i][j-1]: * matches empty\n      } else if (p[j-1] === '?' || s[i-1] === p[j-1]) {\n        dp[i][j] = dp[i-1][j-1];\n      }\n    }\n  }\n  \n  return dp[m][n];\n}\n\nisMatch(\"adceb\", \"*a*b\"); // true\nisMatch(\"acdcb\", \"a*c?b\"); // false"
+  },
+  {
+    "id": "sj17",
+    "level": "expert",
+    "q": "Implement a basic regex matcher that supports \".\" (any char) and \"*\" (zero or more of preceding).\nExample: s=\"aab\", p=\"c*a*b\" → true",
+    "a": "// Recursive with memoization\nfunction isMatch(s, p) {\n  const memo = new Map();\n  \n  function dp(i, j) {\n    const key = i + ',' + j;\n    if (memo.has(key)) return memo.get(key);\n    \n    if (j === p.length) return i === s.length;\n    \n    const firstMatch = i < s.length && (p[j] === '.' || p[j] === s[i]);\n    \n    let result;\n    if (j + 1 < p.length && p[j + 1] === '*') {\n      // '*' matches zero (skip pattern) OR matches one and advance s\n      result = dp(i, j + 2) || (firstMatch && dp(i + 1, j));\n    } else {\n      result = firstMatch && dp(i + 1, j + 1);\n    }\n    \n    memo.set(key, result);\n    return result;\n  }\n  \n  return dp(0, 0);\n}\n\nisMatch(\"aa\", \"a*\");    // true\nisMatch(\"ab\", \".*\");    // true\nisMatch(\"aab\", \"c*a*b\"); // true\nisMatch(\"mississippi\", \"mis*is*p*.\"); // false"
+  },
+  {
+    "id": "sj18",
+    "level": "expert",
+    "q": "Find the longest palindromic substring.\nExample: \"babad\" → \"bab\" or \"aba\"",
+    "a": "// Expand around center — O(n^2) time, O(1) space\nfunction longestPalindrome(s) {\n  let start = 0, maxLen = 0;\n  \n  function expand(l, r) {\n    while (l >= 0 && r < s.length && s[l] === s[r]) {\n      if (r - l + 1 > maxLen) {\n        maxLen = r - l + 1;\n        start = l;\n      }\n      l--; r++;\n    }\n  }\n  \n  for (let i = 0; i < s.length; i++) {\n    expand(i, i);     // odd-length\n    expand(i, i + 1); // even-length\n  }\n  \n  return s.slice(start, start + maxLen);\n}\n\n// O(n) Manacher's algorithm exists but expand-around-center suffices for interviews.\nlongestPalindrome(\"babad\");  // \"bab\"\nlongestPalindrome(\"cbbd\");   // \"bb\"\nlongestPalindrome(\"racecar\"); // \"racecar\""
+  },
+  {
+    "id": "sj19",
+    "level": "intermediate",
+    "q": "Remove duplicate characters from a string, keeping only the first occurrence.\nExample: \"programming\" → \"progamin\"",
+    "a": "// Method 1: Set (preserves insertion order in JS)\nfunction removeDuplicates(str) {\n  return [...new Set(str)].join('');\n}\n\n// Method 2: Manual tracking\nfunction removeDuplicates2(str) {\n  const seen = new Set();\n  let result = '';\n  for (const c of str) {\n    if (!seen.has(c)) {\n      seen.add(c);\n      result += c;\n    }\n  }\n  return result;\n}\n\nremoveDuplicates(\"programming\"); // \"progamin\"\nremoveDuplicates(\"hello world\"); // \"helo wrd\""
+  },
+  {
+    "id": "sj20",
+    "level": "advanced",
+    "q": "Implement a function to group anagrams together.\nExample: [\"eat\",\"tea\",\"tan\",\"ate\",\"nat\",\"bat\"] → [[\"eat\",\"tea\",\"ate\"],[\"tan\",\"nat\"],[\"bat\"]]",
+    "a": "// Sort each word as key — O(n * k log k) where k = max word length\nfunction groupAnagrams(strs) {\n  const map = new Map();\n  \n  for (const str of strs) {\n    const key = str.split('').sort().join('');\n    if (!map.has(key)) map.set(key, []);\n    map.get(key).push(str);\n  }\n  \n  return [...map.values()];\n}\n\n// Alternative: Count-based key (O(n*k), no sorting)\nfunction groupAnagrams2(strs) {\n  const map = new Map();\n  for (const str of strs) {\n    const count = new Array(26).fill(0);\n    for (const c of str) count[c.charCodeAt(0) - 97]++;\n    const key = count.join(',');\n    if (!map.has(key)) map.set(key, []);\n    map.get(key).push(str);\n  }\n  return [...map.values()];\n}\n\ngroupAnagrams([\"eat\",\"tea\",\"tan\",\"ate\",\"nat\",\"bat\"]);\n// [[\"eat\",\"tea\",\"ate\"],[\"tan\",\"nat\"],[\"bat\"]]"
+  }
+]

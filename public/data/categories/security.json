@@ -1,0 +1,38 @@
+[
+  {
+    "id": "sec1",
+    "level": "beginner",
+    "q": "What is JWT (JSON Web Token)? Explain its structure and how it works.",
+    "a": "JWT is a compact, self-contained token for securely transmitting information between parties.\n\nStructure (3 Base64URL parts separated by dots):\n  Header.Payload.Signature\n\nHeader: Algorithm and token type.\n  { \"alg\": \"HS256\", \"typ\": \"JWT\" }\n\nPayload: Claims (user data).\n  { \"sub\": \"1234567890\", \"name\": \"Vincent\", \"role\": \"admin\", \"exp\": 1716... }\n\nSignature: HMACSHA256(Base64(header) + \".\" + Base64(payload), secret)\n  — Verifies token wasn't tampered with.\n\nFlow:\n1. User logs in → Server validates credentials → Issues JWT.\n2. Client stores JWT (localStorage / httpOnly cookie).\n3. Client sends JWT in Authorization: Bearer <token> header.\n4. Server validates signature + expiry → allows/denies.\n\nJWT is stateless — server doesn't need to store session. Verify with secret key."
+  },
+  {
+    "id": "sec2",
+    "level": "intermediate",
+    "q": "What is the JWT refresh token pattern and why is it needed?",
+    "a": "Access token: Short-lived (5-60 min) JWT for API calls. Short expiry limits damage if stolen.\nRefresh token: Long-lived (7-30 days) opaque token, stored securely, used only to get new access tokens.\n\nFlow:\n1. Login → Server returns access_token (JWT, 15min) + refresh_token (UUID, 7 days).\n2. Client uses access_token for API calls.\n3. Access token expires → Client sends refresh_token to /auth/refresh.\n4. Server validates refresh_token (checks DB, not expired, not revoked).\n5. Issues new access_token (+ optionally rotates refresh_token — invalidate old one).\n6. On logout → delete refresh_token from DB.\n\nSecurity: Store refresh token in httpOnly cookie (not localStorage) to prevent XSS.\n\nToken rotation: Each refresh invalidates the old refresh_token (one-time use) — detects token theft.\n\nRefresh token in DB enables: Logout, session management, revocation."
+  },
+  {
+    "id": "sec3",
+    "level": "intermediate",
+    "q": "What is RBAC vs ABAC? How do you implement policy-based authorization in ASP.NET Core?",
+    "a": "RBAC (Role-Based): Access based on user roles.\n  [Authorize(Roles = \"Admin,Manager\")]\n\nABAC (Attribute-Based): Access based on attributes (user, resource, environment).\n  \"User can edit order only if they own it and it's in Pending state.\"\n\nASP.NET Core Policy-Based Authorization:\n  builder.Services.AddAuthorization(opt => {\n    opt.AddPolicy(\"CanEditOrder\", policy =>\n      policy.RequireAuthenticatedUser()\n            .RequireClaim(\"department\", \"Sales\", \"Admin\")\n            .AddRequirements(new OrderOwnerRequirement()));\n  });\n\nCustom requirement:\n  public class OrderOwnerHandler : AuthorizationHandler<OrderOwnerRequirement, Order> {\n    protected override Task HandleRequirementAsync(\n      AuthorizationHandlerContext ctx, OrderOwnerRequirement req, Order order) {\n      var userId = ctx.User.FindFirstValue(ClaimTypes.NameIdentifier);\n      if (order.OwnerId == userId) ctx.Succeed(req);\n      return Task.CompletedTask;\n    }\n  }\n\nApply: [Authorize(Policy = \"CanEditOrder\")]"
+  },
+  {
+    "id": "sec4",
+    "level": "advanced",
+    "q": "What are the OWASP Top 10 vulnerabilities for APIs? How do you protect against them?",
+    "a": "1. Broken Object Level Authorization: Always verify user owns the resource.\n   if (order.UserId != currentUserId) throw new ForbiddenException();\n\n2. Broken Auth: Use strong JWT validation, token rotation, rate limit login endpoint.\n\n3. Broken Object Property Level Auth: Don't expose internal fields; use DTOs.\n\n4. Unrestricted Resource Consumption: Rate limiting (AspNetCoreRateLimit), pagination, request size limits.\n\n5. Broken Function Level Auth: Check role/permission on every endpoint, not just UI.\n\n6. Unrestricted Access to Sensitive Business Flows: CAPTCHA, device fingerprinting, anomaly detection.\n\n7. SSRF: Validate/whitelist outgoing URLs from user input.\n\n8. Security Misconfiguration: Disable debug in production, update packages, remove default endpoints.\n\n9. Improper Inventory Management: Keep API versions managed, decommission old endpoints.\n\n10. Unsafe Consumption of APIs: Validate third-party API responses, don't trust blindly.\n\nFor your stack: Use [ApiController] for automatic validation, keep secrets in Azure Key Vault / User Secrets, enable HTTPS, use parameterized queries."
+  },
+  {
+    "id": "sec5",
+    "level": "advanced",
+    "q": "Explain OAuth2 authorization code flow with PKCE. When is it used?",
+    "a": "OAuth2 is an authorization framework; PKCE (Proof Key for Code Exchange) secures the authorization code flow for public clients.\n\nWhy PKCE: Public clients (SPAs, mobile apps) can't store a client_secret. PKCE replaces it.\n\nFlow:\n1. Client generates code_verifier (random string) and code_challenge = SHA256(code_verifier).\n2. Client redirects user to auth server: ?response_type=code&code_challenge=...&code_challenge_method=S256\n3. User authenticates → auth server returns authorization_code to redirect_uri.\n4. Client exchanges code for tokens: POST /token with code + code_verifier.\n5. Auth server hashes code_verifier, compares to stored code_challenge → if match, issues tokens.\n\nSecurity: Even if attacker intercepts the code, they can't exchange it without code_verifier.\n\nUse PKCE for: SPAs (react app), mobile apps, CLI tools.\nUse client credentials for: Machine-to-machine (no user involved).\nUse authorization code (without PKCE) for: Confidential server-side apps."
+  },
+  {
+    "id": "sec6",
+    "level": "expert",
+    "q": "What strategies exist for JWT token revocation (since JWTs are stateless)?",
+    "a": "Problem: JWTs are valid until expiry — no built-in revocation. Logout can't invalidate a token that's been issued.\n\nStrategies:\n\n1. Short expiry + refresh tokens:\n   - Make access tokens expire in 5-15 min.\n   - On logout, delete refresh token from DB.\n   - Attacker's access token expires soon anyway.\n\n2. Token blocklist (denylist):\n   - Store revoked token JTIs (JWT ID claim) in Redis with TTL = token expiry.\n   - Middleware checks Redis on each request.\n   - Overhead: One Redis lookup per request.\n\n3. Token versioning:\n   - Add \"tokenVersion\" field to user record in DB.\n   - Include version in JWT payload.\n   - On logout/password change, increment version in DB.\n   - Middleware verifies JWT version matches DB version.\n   - Overhead: One DB/cache lookup per request.\n\n4. Reference tokens:\n   - JWT is replaced by an opaque token; server stores the actual claims.\n   - Introspection endpoint validates token (IdentityServer approach).\n   - Easy revocation, but every request hits the auth server.\n\nBest practice: Strategy 1 for most cases; Strategy 3 for security-critical apps."
+  }
+]

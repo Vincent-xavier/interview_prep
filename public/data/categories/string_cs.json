@@ -1,0 +1,92 @@
+[
+  {
+    "id": "sc_s1",
+    "level": "beginner",
+    "q": "Reverse a string in C# — multiple approaches.",
+    "a": "// Method 1: Array.Reverse\nstring Reverse(string s) {\n  char[] arr = s.ToCharArray();\n  Array.Reverse(arr);\n  return new string(arr);\n}\n\n// Method 2: LINQ\nstring Reverse2(string s) => new string(s.Reverse().ToArray());\n\n// Method 3: StringBuilder (efficient for large strings)\nstring Reverse3(string s) {\n  var sb = new StringBuilder(s.Length);\n  for (int i = s.Length - 1; i >= 0; i--)\n    sb.Append(s[i]);\n  return sb.ToString();\n}\n\n// Method 4: Two-pointer on Span<char>\nstring Reverse4(string s) {\n  Span<char> chars = s.ToCharArray();\n  for (int l = 0, r = chars.Length - 1; l < r; l++, r--)\n    (chars[l], chars[r]) = (chars[r], chars[l]);\n  return new string(chars);\n}"
+  },
+  {
+    "id": "sc_s2",
+    "level": "beginner",
+    "q": "Check if a string is a palindrome in C# (case-insensitive, ignore spaces).",
+    "a": "bool IsPalindrome(string s) {\n  // Clean: lowercase, only alphanumeric\n  string clean = new string(\n    s.ToLower().Where(char.IsLetterOrDigit).ToArray()\n  );\n  \n  int l = 0, r = clean.Length - 1;\n  while (l < r) {\n    if (clean[l] != clean[r]) return false;\n    l++; r--;\n  }\n  return true;\n}\n\n// Using Span for zero allocation:\nbool IsPalindrome2(ReadOnlySpan<char> s) {\n  int l = 0, r = s.Length - 1;\n  while (l < r) {\n    if (s[l] != s[r]) return false;\n    l++; r--;\n  }\n  return true;\n}\n\nIsPalindrome(\"A man a plan a canal Panama\"); // true"
+  },
+  {
+    "id": "sc_s3",
+    "level": "intermediate",
+    "q": "Count word frequency in a string in C#.",
+    "a": "Dictionary<string, int> WordFrequency(string text) {\n  return text\n    .Split(new[] {' ', '.', ',', '!', '?'}, StringSplitOptions.RemoveEmptyEntries)\n    .Select(w => w.ToLower())\n    .GroupBy(w => w)\n    .ToDictionary(g => g.Key, g => g.Count());\n}\n\n// Without LINQ:\nDictionary<string, int> WordFrequency2(string text) {\n  var freq = new Dictionary<string, int>();\n  foreach (var word in text.ToLower().Split(' '))\n  {\n    var clean = word.Trim('.', ',', '!');\n    if (!string.IsNullOrEmpty(clean))\n      freq[clean] = freq.GetValueOrDefault(clean) + 1;\n  }\n  return freq;\n}\n\nWordFrequency(\"the cat sat on the mat the cat\");\n// { \"the\":3, \"cat\":2, \"sat\":1, \"on\":1, \"mat\":1 }"
+  },
+  {
+    "id": "sc_s4",
+    "level": "intermediate",
+    "q": "Check if two strings are anagrams in C# — O(n) approach.",
+    "a": "bool AreAnagrams(string s1, string s2) {\n  if (s1.Length != s2.Length) return false;\n  \n  Span<int> count = stackalloc int[26]; // zero-allocation!\n  \n  for (int i = 0; i < s1.Length; i++) {\n    count[s1[i] - 'a']++;\n    count[s2[i] - 'a']--;\n  }\n  \n  foreach (var c in count)\n    if (c != 0) return false;\n    \n  return true;\n}\n\n// LINQ alternative:\nbool AreAnagrams2(string s1, string s2) =>\n  s1.Length == s2.Length &&\n  s1.OrderBy(c => c).SequenceEqual(s2.OrderBy(c => c));\n\nAreAnagrams(\"listen\", \"silent\"); // true"
+  },
+  {
+    "id": "sc_s5",
+    "level": "intermediate",
+    "q": "Find the longest common prefix among an array of strings in C#.",
+    "a": "string LongestCommonPrefix(string[] strs) {\n  if (strs.Length == 0) return \"\";\n  \n  string prefix = strs[0];\n  \n  foreach (var s in strs.Skip(1)) {\n    while (!s.StartsWith(prefix, StringComparison.Ordinal)) {\n      prefix = prefix[..^1]; // remove last char\n      if (prefix.Length == 0) return \"\";\n    }\n  }\n  \n  return prefix;\n}\n\n// Using Span for efficiency:\nstring LongestCommonPrefix2(string[] strs) {\n  if (!strs.Any()) return \"\";\n  int maxLen = strs.Min(s => s.Length);\n  int i = 0;\n  while (i < maxLen && strs.All(s => s[i] == strs[0][i])) i++;\n  return strs[0][..i];\n}\n\nLongestCommonPrefix([\"flower\",\"flow\",\"flight\"]); // \"fl\""
+  },
+  {
+    "id": "sc_s6",
+    "level": "intermediate",
+    "q": "Implement string compression in C# (run-length encoding).\nExample: \"aabcccdddd\" → \"a2b1c3d4\"",
+    "a": "string Compress(string s) {\n  if (string.IsNullOrEmpty(s)) return s;\n  \n  var sb = new StringBuilder();\n  int count = 1;\n  \n  for (int i = 1; i <= s.Length; i++) {\n    if (i < s.Length && s[i] == s[i - 1]) {\n      count++;\n    } else {\n      sb.Append(s[i - 1]);\n      sb.Append(count);\n      count = 1;\n    }\n  }\n  \n  string result = sb.ToString();\n  return result.Length < s.Length ? result : s;\n}\n\nCompress(\"aabcccdddd\"); // \"a2b1c3d4\"\nCompress(\"abcd\");       // \"abcd\" (not shorter)"
+  },
+  {
+    "id": "sc_s7",
+    "level": "intermediate",
+    "q": "Check balanced parentheses in C# using a stack.",
+    "a": "bool IsBalanced(string s) {\n  var stack = new Stack<char>();\n  var pairs = new Dictionary<char, char> {\n    [')'] = '(',\n    [']'] = '[',\n    ['}'] = '{'\n  };\n  var open = new HashSet<char> { '(', '[', '{' };\n  \n  foreach (char c in s) {\n    if (open.Contains(c)) {\n      stack.Push(c);\n    } else if (pairs.TryGetValue(c, out char match)) {\n      if (!stack.TryPop(out char top) || top != match)\n        return false;\n    }\n  }\n  \n  return stack.Count == 0;\n}\n\nIsBalanced(\"{[()]}\");  // true\nIsBalanced(\"{[(])}\");  // false"
+  },
+  {
+    "id": "sc_s8",
+    "level": "advanced",
+    "q": "Find all permutations of a string in C#.",
+    "a": "IList<string> Permutations(string s) {\n  var result = new List<string>();\n  PermuteHelper(s.ToCharArray(), 0, result);\n  return result;\n}\n\nvoid PermuteHelper(char[] arr, int start, List<string> result) {\n  if (start == arr.Length - 1) {\n    result.Add(new string(arr));\n    return;\n  }\n  \n  var seen = new HashSet<char>(); // for unique permutations\n  for (int i = start; i < arr.Length; i++) {\n    if (seen.Contains(arr[i])) continue;\n    seen.Add(arr[i]);\n    \n    (arr[start], arr[i]) = (arr[i], arr[start]); // swap\n    PermuteHelper(arr, start + 1, result);\n    (arr[start], arr[i]) = (arr[i], arr[start]); // swap back\n  }\n}\n\nPermutations(\"abc\"); // 6 unique permutations\nPermutations(\"aab\"); // 3 unique permutations"
+  },
+  {
+    "id": "sc_s9",
+    "level": "advanced",
+    "q": "Find the longest substring without repeating characters in C# using sliding window.",
+    "a": "int LengthOfLongestSubstring(string s) {\n  var lastSeen = new Dictionary<char, int>();\n  int maxLen = 0, left = 0;\n  \n  for (int right = 0; right < s.Length; right++) {\n    char c = s[right];\n    \n    if (lastSeen.TryGetValue(c, out int prevIdx) && prevIdx >= left)\n      left = prevIdx + 1;\n    \n    lastSeen[c] = right;\n    maxLen = Math.Max(maxLen, right - left + 1);\n  }\n  \n  return maxLen;\n}\n\n// Using Span for character indexing (only for ASCII):\nint LongestSubstringAscii(ReadOnlySpan<char> s) {\n  Span<int> lastPos = stackalloc int[128];\n  lastPos.Fill(-1);\n  int maxLen = 0, left = 0;\n  for (int i = 0; i < s.Length; i++) {\n    int c = s[i];\n    if (lastPos[c] >= left) left = lastPos[c] + 1;\n    lastPos[c] = i;\n    maxLen = Math.Max(maxLen, i - left + 1);\n  }\n  return maxLen;\n}\n\nLengthOfLongestSubstring(\"abcabcbb\"); // 3\nLengthOfLongestSubstring(\"pwwkew\");   // 3"
+  },
+  {
+    "id": "sc_s10",
+    "level": "advanced",
+    "q": "Parse a CSV line in C# correctly handling quoted fields with commas inside.\nExample: 'name,\"city, state\",age' → [\"name\", \"city, state\", \"age\"]",
+    "a": "IList<string> ParseCsvLine(string line) {\n  var fields = new List<string>();\n  var current = new StringBuilder();\n  bool inQuotes = false;\n  \n  for (int i = 0; i < line.Length; i++) {\n    char c = line[i];\n    \n    if (c == '\"') {\n      if (inQuotes && i + 1 < line.Length && line[i + 1] == '\"') {\n        // Escaped quote \"\" → single \"\n        current.Append('\"');\n        i++;\n      } else {\n        inQuotes = !inQuotes;\n      }\n    } else if (c == ',' && !inQuotes) {\n      fields.Add(current.ToString());\n      current.Clear();\n    } else {\n      current.Append(c);\n    }\n  }\n  \n  fields.Add(current.ToString());\n  return fields;\n}\n\nParseCsvLine(@\"name,\"\"city, state\"\",age\");\n// [\"name\", \"city, state\", \"age\"]"
+  },
+  {
+    "id": "sc_s11",
+    "level": "advanced",
+    "q": "Implement a trie (prefix tree) in C# for efficient string prefix search.",
+    "a": "public class TrieNode {\n  public Dictionary<char, TrieNode> Children = new();\n  public bool IsEnd;\n}\n\npublic class Trie {\n  private readonly TrieNode _root = new();\n  \n  public void Insert(string word) {\n    var node = _root;\n    foreach (char c in word) {\n      node.Children.TryGetValue(c, out var child);\n      if (child is null) { child = new TrieNode(); node.Children[c] = child; }\n      node = child;\n    }\n    node.IsEnd = true;\n  }\n  \n  public bool Search(string word) {\n    var node = Find(word);\n    return node is { IsEnd: true };\n  }\n  \n  public bool StartsWith(string prefix) => Find(prefix) is not null;\n  \n  private TrieNode? Find(string s) {\n    var node = _root;\n    foreach (char c in s) {\n      if (!node.Children.TryGetValue(c, out node)) return null;\n    }\n    return node;\n  }\n}\n\nvar trie = new Trie();\ntrie.Insert(\"apple\");\ntrie.Search(\"apple\");   // true\ntrie.StartsWith(\"app\"); // true"
+  },
+  {
+    "id": "sc_s12",
+    "level": "expert",
+    "q": "Implement KMP (Knuth-Morris-Pratt) string search algorithm in C#.\nFind pattern in text efficiently O(n+m).",
+    "a": "// Brute force is O(n*m). KMP is O(n+m).\nint[] BuildLPS(string pattern) {\n  // Longest Proper Prefix that is also Suffix\n  int m = pattern.Length;\n  int[] lps = new int[m];\n  int len = 0, i = 1;\n  \n  while (i < m) {\n    if (pattern[i] == pattern[len]) {\n      lps[i++] = ++len;\n    } else if (len > 0) {\n      len = lps[len - 1]; // fallback\n    } else {\n      lps[i++] = 0;\n    }\n  }\n  return lps;\n}\n\nList<int> KmpSearch(string text, string pattern) {\n  var matches = new List<int>();\n  if (pattern.Length == 0) return matches;\n  \n  int[] lps = BuildLPS(pattern);\n  int i = 0, j = 0;\n  \n  while (i < text.Length) {\n    if (text[i] == pattern[j]) { i++; j++; }\n    if (j == pattern.Length) {\n      matches.Add(i - j); // found at index i-j\n      j = lps[j - 1];\n    } else if (i < text.Length && text[i] != pattern[j]) {\n      j = j > 0 ? lps[j - 1] : 0;\n      if (j == 0) i++;\n    }\n  }\n  return matches;\n}\n\nKmpSearch(\"AABAACAADAABAABA\", \"AABA\"); // [0, 9, 12]"
+  },
+  {
+    "id": "sc_s13",
+    "level": "expert",
+    "q": "Implement a function to decode a string encoded as k[encoded_string].\nExample: \"3[a]2[bc]\" → \"aaabcbc\", \"2[abc]3[cd]ef\" → \"abcabccdcdcdef\"",
+    "a": "string DecodeString(string s) {\n  var countStack = new Stack<int>();\n  var strStack = new Stack<string>();\n  string current = \"\";\n  int k = 0;\n  \n  foreach (char c in s) {\n    if (char.IsDigit(c)) {\n      k = k * 10 + (c - '0'); // handle multi-digit k\n    } else if (c == '[') {\n      countStack.Push(k);\n      strStack.Push(current);\n      current = \"\";\n      k = 0;\n    } else if (c == ']') {\n      int repeat = countStack.Pop();\n      string prefix = strStack.Pop();\n      var sb = new StringBuilder(prefix);\n      for (int i = 0; i < repeat; i++) sb.Append(current);\n      current = sb.ToString();\n    } else {\n      current += c;\n    }\n  }\n  \n  return current;\n}\n\nDecodeString(\"3[a]2[bc]\");          // \"aaabcbc\"\nDecodeString(\"3[a2[c]]\");           // \"accaccacc\"\nDecodeString(\"2[abc]3[cd]ef\");      // \"abcabccdcdcdef\""
+  },
+  {
+    "id": "sc_s14",
+    "level": "expert",
+    "q": "Given a string containing words, reverse the words but keep each word's characters in order.\nExample: \"the sky is blue\" → \"blue is sky the\"",
+    "a": "// Method 1: Split and join (simple)\nstring ReverseWords(string s) =>\n  string.Join(' ', s.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Reverse());\n\n// Method 2: In-place using Span<char> (interview-grade)\nstring ReverseWords2(string s) {\n  Span<char> chars = s.ToCharArray();\n  \n  // Step 1: Reverse entire string\n  Reverse(chars, 0, chars.Length - 1);\n  \n  // Step 2: Reverse each word\n  int start = 0;\n  for (int i = 0; i <= chars.Length; i++) {\n    if (i == chars.Length || chars[i] == ' ') {\n      Reverse(chars, start, i - 1);\n      start = i + 1;\n    }\n  }\n  \n  return new string(chars).Trim();\n}\n\nvoid Reverse(Span<char> s, int l, int r) {\n  while (l < r) { (s[l], s[r]) = (s[r], s[l]); l++; r--; }\n}\n\nReverseWords(\"the sky is blue\"); // \"blue is sky the\""
+  },
+  {
+    "id": "sc_s15",
+    "level": "expert",
+    "q": "Find the minimum window substring in C# — given s and t, find the smallest window in s that contains all chars in t.",
+    "a": "string MinWindow(string s, string t) {\n  if (s.Length == 0 || t.Length == 0) return \"\";\n  \n  var need = new Dictionary<char, int>();\n  foreach (char c in t) need[c] = need.GetValueOrDefault(c) + 1;\n  \n  var have = new Dictionary<char, int>();\n  int formed = 0, required = need.Count;\n  int left = 0, minLen = int.MaxValue, minStart = 0;\n  \n  for (int right = 0; right < s.Length; right++) {\n    char c = s[right];\n    have[c] = have.GetValueOrDefault(c) + 1;\n    \n    if (need.ContainsKey(c) && have[c] == need[c]) formed++;\n    \n    while (formed == required) {\n      if (right - left + 1 < minLen) {\n        minLen = right - left + 1;\n        minStart = left;\n      }\n      char leftChar = s[left++];\n      have[leftChar]--;\n      if (need.ContainsKey(leftChar) && have[leftChar] < need[leftChar])\n        formed--;\n    }\n  }\n  \n  return minLen == int.MaxValue ? \"\" : s.Substring(minStart, minLen);\n}\n\nMinWindow(\"ADOBECODEBANC\", \"ABC\"); // \"BANC\""
+  }
+]

@@ -1,6 +1,6 @@
 # ⚡ Interview Prep — Vincent Xavier
 
-A full React + TypeScript + Vite interview preparation app with **258+ questions** across 21 categories. Progress is saved in `localStorage`.
+A React + TypeScript + Vite interview prep app: **routes per topic**, full-text **search** (question + answer + tips), **export/import** of progress, and data split by category. Progress and revealed cards persist in `localStorage`.
 
 ## 🚀 Quick Start
 
@@ -18,68 +18,50 @@ npm run build
 # Output in dist/ — deploy anywhere (Netlify, Vercel, GitHub Pages)
 ```
 
-## 📂 Project Structure
+## 📂 Question data (split files)
 
-```
-src/
-├── main.tsx                  # Entry point
-├── App.tsx                   # Root component
-├── index.css                 # Global styles
-├── types/
-│   └── index.ts              # TypeScript interfaces
-├── data/
-│   ├── categories.ts         # Category definitions + groups
-│   └── questions/
-│       ├── index.ts          # Aggregates all question files
-│       ├── react.ts
-│       ├── react_extra.ts
-│       ├── typescript.ts
-│       ├── js_core.ts
-│       ├── redux.ts
-│       ├── dotnet.ts
-│       ├── aspnet.ts
-│       ├── ef_linq.ts
-│       ├── database.ts
-│       ├── security.ts
-│       ├── solid.ts
-│       ├── microservices.ts
-│       ├── system_design.ts
-│       ├── performance.ts
-│       ├── testing.ts
-│       ├── devops.ts
-│       ├── scenario.ts
-│       ├── string_js.ts
-│       ├── string_cs.ts
-│       ├── hr_behavior.ts
-│       └── db_code.ts
-├── hooks/
-│   └── useProgress.ts        # localStorage persistence + stats
-└── components/
-    ├── Header.tsx
-    ├── Sidebar.tsx
-    ├── ProgressOverview.tsx
-    ├── FilterBar.tsx
-    └── QuestionCard.tsx
+- `public/data/manifest.json` — lists categories and the relative path of each JSON array.
+- `public/data/categories/<category_id>.json` — questions for that category.
+
+Optional: merge into one file for bulk editing, then split again:
+
+```bash
+node scripts/merge-questions.mjs   # optional: writes public/data/questions.json (gitignored) for one-file edits
+node scripts/split-questions.mjs   # reads questions.json → writes manifest + categories/ (needs merged file first)
 ```
 
-## ➕ Adding Questions
+Runtime loads **`manifest.json` + `categories/*.json`** only.
 
-Edit `public/data/questions.json`. It is a map of category id → array of questions. Each question follows this shape:
+### Question JSON shape
 
 ```json
 {
   "id": "unique_id",
   "level": "beginner",
   "q": "Your question text",
-  "a": "Multi-line answer\\nwith code examples (escape quotes and newlines in JSON)"
+  "a": "Multi-line answer",
+  "tips": "Optional interview framing hint.",
+  "structure": [{ "label": "Opening", "text": "What to say out loud." }]
 }
 ```
 
-Valid `level` values: `beginner`, `intermediate`, `advanced`, `expert`. Category keys must match ids in `src/data/categories.ts`.
+Valid `level` values: `beginner`, `intermediate`, `advanced`, `expert`. Category ids must match `src/data/categories.ts`.
+
+### URLs
+
+- Topic: `/study/<categoryId>` (e.g. `/study/react`).
+- Jump to a card (scroll + reveal): `/study/react?q=r1`.
+
+## 🧪 Tests
+
+```bash
+npm test
+```
 
 ## 🛠️ Tech Stack
 
-- **React 18** + **TypeScript**
+- **React 18** + **TypeScript** + **React Router**
 - **Vite** (dev server + build)
-- **localStorage** (zero-backend persistence)
+- **Vitest** (unit tests)
+- **localStorage** (progress + revealed state + dismissed tip banner)
 - Pure CSS (no UI framework)

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "do1",
+    "level": "beginner",
+    "q": "What is Docker? Explain images, containers, and Dockerfile.",
+    "a": "Docker: A platform for packaging applications into portable containers that run consistently across environments.\n\nImage: Read-only blueprint (like a class). Contains OS, runtime, dependencies, app code.\nContainer: Running instance of an image (like an object). Isolated process.\n\nDockerfile (example for .NET app):\n  FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime\n  WORKDIR /app\n  COPY ./publish .\n  EXPOSE 8080\n  ENTRYPOINT [\"dotnet\", \"MyApp.dll\"]\n\nBuild & run:\n  docker build -t myapp:1.0 .\n  docker run -p 8080:8080 --env-file .env myapp:1.0\n\nCommon commands:\n  docker ps                 # list running containers\n  docker logs <container>   # view logs\n  docker exec -it <id> bash # shell into container\n  docker images             # list images"
+  },
+  {
+    "id": "do2",
+    "level": "intermediate",
+    "q": "What is a multi-stage Docker build? Why is it important for .NET apps?",
+    "a": "Multi-stage build: Use multiple FROM statements — each stage can be a different base image, and only the needed artifacts are copied to the final stage.\n\nWhy it matters: The .NET SDK image (~700MB) is needed to build but NOT for running. The runtime image is ~210MB.\n\nMulti-stage .NET Dockerfile:\n  # Stage 1: Build\n  FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\n  WORKDIR /src\n  COPY *.csproj .\n  RUN dotnet restore\n  COPY . .\n  RUN dotnet publish -c Release -o /app/publish\n\n  # Stage 2: Runtime (final image only contains published output)\n  FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final\n  WORKDIR /app\n  COPY --from=build /app/publish .\n  EXPOSE 8080\n  ENTRYPOINT [\"dotnet\", \"MyApp.dll\"]\n\nResult: Final image is ~250MB instead of ~800MB.\nBonus: Secrets used in build stage (NuGet credentials) don't end up in final image."
+  },
+  {
+    "id": "do3",
+    "level": "intermediate",
+    "q": "What is Docker Compose? Write a compose file for a .NET API + PostgreSQL.",
+    "a": "Docker Compose: Define and run multi-container applications via a YAML file.\n\n  version: \"3.9\"\n  services:\n    api:\n      build:\n        context: .\n        dockerfile: Dockerfile\n      ports:\n        - \"8080:8080\"\n      environment:\n        - ASPNETCORE_ENVIRONMENT=Development\n        - ConnectionStrings__Default=Host=db;Database=mydb;Username=admin;Password=secret\n      depends_on:\n        db:\n          condition: service_healthy\n\n    db:\n      image: postgres:15-alpine\n      environment:\n        POSTGRES_USER: admin\n        POSTGRES_PASSWORD: secret\n        POSTGRES_DB: mydb\n      ports:\n        - \"5432:5432\"\n      volumes:\n        - pgdata:/var/lib/postgresql/data\n      healthcheck:\n        test: [\"CMD-SHELL\", \"pg_isready -U admin\"]\n        interval: 5s\n        retries: 5\n\n  volumes:\n    pgdata:\n\nCommands:\n  docker compose up --build   # start all services\n  docker compose down -v      # stop and remove volumes"
+  },
+  {
+    "id": "do4",
+    "level": "intermediate",
+    "q": "Explain CI/CD pipeline — what happens in each stage?",
+    "a": "CI (Continuous Integration): Automatically build and test code on every push.\nCD (Continuous Delivery/Deployment): Automatically deploy to environments after CI passes.\n\nTypical GitHub Actions pipeline for .NET:\n  name: CI/CD\n  on: [push]\n  jobs:\n    build-and-test:\n      runs-on: ubuntu-latest\n      steps:\n        - uses: actions/checkout@v4\n        - uses: actions/setup-dotnet@v3\n          with: { dotnet-version: '8.0' }\n        - run: dotnet restore\n        - run: dotnet build --no-restore\n        - run: dotnet test --no-build --logger trx\n        - run: dotnet publish -c Release -o ./publish\n    \n    docker-push:\n      needs: build-and-test\n      steps:\n        - uses: docker/login-action@v3\n          with: { registry: ghcr.io, username: ${{ github.actor }}, password: ${{ secrets.GITHUB_TOKEN }} }\n        - run: docker build -t ghcr.io/myorg/myapp:${{ github.sha }} .\n        - run: docker push ghcr.io/myorg/myapp:${{ github.sha }}\n    \n    deploy:\n      needs: docker-push\n      steps:\n        - run: # SSH into server, docker pull, docker compose up -d"
+  },
+  {
+    "id": "do5",
+    "level": "advanced",
+    "q": "What is the difference between blue-green and canary deployments?",
+    "a": "Both minimize downtime and risk during deployments.\n\nBlue-Green Deployment:\n- Two identical production environments (Blue = live, Green = staging).\n- Deploy to Green; test it; switch traffic from Blue → Green (DNS/load balancer).\n- Instant rollback: switch back to Blue if issues.\n- Downside: 2× infrastructure cost; not suitable for DB schema changes.\n\nCanary Deployment:\n- Gradually roll out new version to a small % of users (5% → 25% → 100%).\n- Monitor error rates, latency, business metrics at each stage.\n- If metrics degrade, roll back automatically.\n- Downside: Complex routing (requires feature flags or weighted load balancing).\n\nRolling Deployment:\n- Replace instances one by one with the new version.\n- Zero downtime but harder to roll back, and both versions run simultaneously for a period.\n\nIn Azure DevOps: Deployment stages with gates (run tests, check metrics before promoting)."
+  }
+]

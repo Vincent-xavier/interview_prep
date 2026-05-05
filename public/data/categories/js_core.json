@@ -1,0 +1,122 @@
+[
+  {
+    "id": "js1",
+    "level": "beginner",
+    "q": "What is the difference between var, let, and const?",
+    "a": "var: Function-scoped. Hoisted and initialized to undefined. Can be re-declared. Avoid.\n\nlet: Block-scoped. Hoisted but NOT initialized (Temporal Dead Zone). Can be re-assigned.\n\nconst: Block-scoped. Must be initialized. Cannot be re-assigned (binding). Objects/arrays can still be mutated:\n  const obj = { a: 1 }; obj.a = 2; // ✅ mutation\n  obj = {};               // ❌ reassignment\n\nBest practice: Use const by default, let when reassignment needed, never var."
+  },
+  {
+    "id": "js2",
+    "level": "beginner",
+    "q": "Explain closures in JavaScript with a practical example.",
+    "a": "A closure is a function that \"remembers\" variables from its outer scope after the outer function returns.\n\n  function makeCounter() {\n    let count = 0;\n    return {\n      increment: () => ++count,\n      getCount:  () => count,\n    };\n  }\n  const counter = makeCounter();\n  counter.increment(); // 1\n  counter.increment(); // 2\n  counter.getCount();  // 2 — count survives makeCounter's return\n\nUses: Data privacy, memoization, currying, event handlers retaining context.\n\nClassic loop bug with var:\n  for (var i = 0; i < 3; i++)\n    setTimeout(() => console.log(i), 100); // 3 3 3\n  // Fix: use let (block-scoped per iteration) → 0 1 2"
+  },
+  {
+    "id": "js3",
+    "level": "beginner",
+    "q": "Explain JavaScript hoisting — what gets hoisted and how?",
+    "a": "Function declarations: Fully hoisted — callable before declaration.\n  greet(); // works\n  function greet() { console.log(\"hi\"); }\n\nvar: Declaration hoisted, initialization NOT. Value is undefined until assigned.\n  console.log(x); // undefined\n  var x = 5;\n\nlet/const: In Temporal Dead Zone (TDZ) — accessing before declaration → ReferenceError.\n  console.log(y); // ReferenceError\n  let y = 10;\n\nFunction expressions: Not hoisted (assigned to var/let).\n  foo(); // TypeError: foo is not a function\n  var foo = function() {};\n\nClass declarations: In TDZ like let."
+  },
+  {
+    "id": "js4",
+    "level": "intermediate",
+    "q": "What is the JavaScript event loop? Explain call stack, Web APIs, microtask vs macrotask queue.",
+    "a": "JS is single-threaded. Event loop manages async.\n\nComponents:\n1. Call Stack: Executes sync code. LIFO.\n2. Web APIs: Browser handles async (setTimeout, fetch, DOM events).\n3. Microtask Queue: Promise .then, queueMicrotask. HIGH priority.\n4. Macrotask Queue: setTimeout, setInterval callbacks. Lower priority.\n\nOrder: Sync → ALL microtasks → ONE macrotask → ALL microtasks → ONE macrotask...\n\n  console.log(\"1\");\n  setTimeout(() => console.log(\"2\"), 0); // macrotask\n  Promise.resolve().then(() => console.log(\"3\")); // microtask\n  console.log(\"4\");\n  // Output: 1, 4, 3, 2\n\nImplication: Promise.then ALWAYS runs before setTimeout(fn, 0)."
+  },
+  {
+    "id": "js5",
+    "level": "intermediate",
+    "q": "What is prototypal inheritance in JavaScript?",
+    "a": "Every JS object has [[Prototype]] link to another object (or null). Property lookup walks the chain.\n\n  const animal = { breathe() { return \"breathing\"; } };\n  const dog = Object.create(animal);\n  dog.bark = () => \"woof\";\n  dog.bark();    // own property\n  dog.breathe(); // found on prototype\n\nES6 class syntax (syntactic sugar over prototypal inheritance):\n  class Animal { speak() {} }\n  class Dog extends Animal { bark() {} }\n  // Dog.prototype.__proto__ === Animal.prototype\n\nhasOwnProperty: Only own properties (not inherited).\nObject.create(null): Object with NO prototype — true hash map."
+  },
+  {
+    "id": "js6",
+    "level": "intermediate",
+    "q": "Explain \"this\" in JavaScript and how arrow functions change it.",
+    "a": "\"this\" depends on HOW a function is called:\n1. Global: window/global.\n2. Object method: the calling object.\n3. Explicit: call/apply/bind set this explicitly.\n4. new: the new object being created.\n5. Arrow: NO own \"this\" — inherits from lexical enclosing scope.\n\n  class Timer {\n    start() {\n      setInterval(() => {\n        this.tick(); // arrow → this = Timer instance ✅\n      }, 1000);\n      setInterval(function() {\n        this.tick(); // regular → this = window ❌\n      }, 1000);\n    }\n  }\n\nStrict mode: this is undefined in plain function calls."
+  },
+  {
+    "id": "js7",
+    "level": "intermediate",
+    "q": "Explain Promise.all, Promise.allSettled, Promise.race, and Promise.any.",
+    "a": "Promise.all: Wait for ALL. Fast-reject if any fails.\n  const [user, orders] = await Promise.all([fetchUser(), fetchOrders()]); // parallel\n\nPromise.allSettled: Wait for ALL to settle (never rejects). Good for independent operations.\n  const results = await Promise.allSettled([p1, p2]);\n  // [{status:'fulfilled', value:...}, {status:'rejected', reason:...}]\n\nPromise.race: First settled (resolve OR reject) wins.\n  const result = await Promise.race([fetchData(), timeout(5000)]); // timeout pattern\n\nPromise.any: First RESOLVED wins. Rejects only if ALL reject (AggregateError).\n  const fastest = await Promise.any([server1.fetch(), server2.fetch()]);"
+  },
+  {
+    "id": "js8",
+    "level": "intermediate",
+    "q": "What is the difference between shallow copy and deep copy? How do you achieve each?",
+    "a": "Shallow copy: Top-level copied; nested objects are shared references.\n  const shallow = { ...obj }; // or Object.assign({}, obj)\n  shallow.nested.x = 99; // original.nested.x ALSO 99 — shared!\n\nDeep copy: Fully independent clone.\n  const deep = structuredClone(obj);    // ✅ ES2022+ handles Date, Map, Set\n  const deep2 = JSON.parse(JSON.stringify(obj)); // ❌ Loses undefined, functions, Date→string\n  const deep3 = _.cloneDeep(obj);       // ✅ Lodash (most compatible)\n\nReact: Always return new objects from state updates — never mutate in place."
+  },
+  {
+    "id": "js9",
+    "level": "intermediate",
+    "q": "What is debouncing vs throttling? Implement both.",
+    "a": "Debounce: Delay execution until N ms of inactivity. Last call wins.\n  function debounce(fn, delay) {\n    let timer;\n    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };\n  }\n  const search = debounce(fetchResults, 300); // fires 300ms after last keystroke\n\nThrottle: At most once per N ms. First call wins.\n  function throttle(fn, limit) {\n    let last = 0;\n    return (...args) => { const now = Date.now(); if (now - last >= limit) { last = now; fn(...args); } };\n  }\n  window.addEventListener('scroll', throttle(handleScroll, 200));\n\nDebounce = \"wait until quiet\". Throttle = \"fire at regular intervals\"."
+  },
+  {
+    "id": "js10",
+    "level": "advanced",
+    "q": "What is a WeakMap and WeakSet? When would you use them?",
+    "a": "WeakMap: Keys must be objects; holds WEAK references — keys can be garbage collected.\nWeakSet: Contains objects; weak references. NOT iterable, no .size.\n\nWeakMap use cases:\n1. Private data without memory leaks:\n   const priv = new WeakMap();\n   class Foo { constructor() { priv.set(this, { secret: 42 }); } }\n   // When Foo instance is GC'd, WeakMap entry auto-removed.\n\n2. Caching per object:\n   const cache = new WeakMap();\n   function compute(obj) {\n     if (cache.has(obj)) return cache.get(obj);\n     const result = expensive(obj);\n     cache.set(obj, result);\n     return result;\n   }\n   // obj GC'd → cache entry removed — no memory leak.\n\nvs Map: Map holds strong references → objects can't be GC'd → potential leak."
+  },
+  {
+    "id": "js11",
+    "level": "advanced",
+    "q": "Explain JavaScript generators and how Redux Saga uses them.",
+    "a": "Generators: Functions that can pause (yield) and resume, producing values lazily.\n\n  function* fibonacci() {\n    let [a, b] = [0, 1];\n    while (true) { yield a; [a, b] = [b, a+b]; }\n  }\n  const fib = fibonacci();\n  fib.next().value; // 0\n  fib.next().value; // 1\n  fib.next().value; // 1\n\nCan receive values: const val = yield somePromise;\n\nRedux Saga uses generators for complex async flows:\n  function* fetchUserSaga(action) {\n    try {\n      const user = yield call(api.getUser, action.id); // pause, await result\n      yield put({ type: 'USER_LOADED', user });         // dispatch action\n    } catch (e) {\n      yield put({ type: 'USER_FAILED', error: e });\n    }\n  }\n  function* rootSaga() {\n    yield takeLatest('FETCH_USER', fetchUserSaga); // cancel prev on new action\n  }\n\nasync/await is syntactic sugar over generators + Promise resolution."
+  },
+  {
+    "id": "js12",
+    "level": "intermediate",
+    "q": "What is event bubbling and capturing? Explain stopPropagation vs preventDefault.",
+    "a": "Event phases: Capture (down: window→target) → Target → Bubble (up: target→window).\nHandlers fire in BUBBLE phase by default. Add { capture: true } for capture.\n\nBubbling: Click button inside div → both handlers fire.\n  <div onClick={() => log(\"div\")}>\n    <button onClick={() => log(\"button\")}>Click</button>\n  </div>\n  // \"button\" then \"div\"\n\ne.stopPropagation(): Stops event from bubbling up — parent handlers don't fire.\ne.stopImmediatePropagation(): Also stops other listeners on SAME element.\ne.preventDefault(): Prevents browser default action (form submit, link navigate). Does NOT stop propagation.\n\nEvent delegation: Attach ONE listener on parent, check e.target.\n  list.addEventListener('click', e => {\n    if (e.target.matches('li')) handle(e.target);\n  });"
+  },
+  {
+    "id": "js13",
+    "level": "intermediate",
+    "q": "What is optional chaining (?.) and nullish coalescing (??)? How do they differ from || and &&?",
+    "a": "Optional Chaining (?.) — safely access nested properties; returns undefined instead of throwing.\n  user?.address?.city      // undefined if user/address is null/undefined\n  arr?.[0]                 // safe array indexing\n  func?.()                 // call only if func exists\n\nNullish Coalescing (??) — returns right side ONLY if left is null or undefined.\n  const name = user.name ?? \"Anonymous\"; // \"Anonymous\" if null/undefined\n  0  ?? 42    // 0   (0 is not null/undefined)\n  \"\" ?? \"hi\"  // \"\"\n\nvs || (logical OR) — returns right side for ANY falsy value:\n  0  || 42    // 42  (treats 0 as falsy — might be wrong!)\n  \"\" || \"hi\"  // \"hi\"\n\nCombined:\n  const city = user?.address?.city ?? \"Unknown\";\n\nNullish Assignment: user.name ??= \"default\"; // assign only if currently null/undefined"
+  },
+  {
+    "id": "js14",
+    "level": "advanced",
+    "q": "What is the Proxy object in JavaScript and how is it used?",
+    "a": "Proxy wraps an object and intercepts fundamental operations.\n\n  const handler = {\n    get(target, prop) {\n      return prop in target ? target[prop] : \"default\";\n    },\n    set(target, prop, value) {\n      if (typeof value !== \"number\") throw TypeError(\"Numbers only!\");\n      target[prop] = value;\n      return true;\n    }\n  };\n  const proxy = new Proxy({}, handler);\n  proxy.x = 5;  // set trap\n  proxy.y;      // get trap → \"default\"\n\nUse cases:\n- Validation (enforce types on assignment).\n- Logging/debugging (intercept all property access).\n- Vue 3's reactivity system is built on Proxy.\n- Immutability enforcement.\n- Default property values.\n\nReflect: Methods matching Proxy traps for invoking default behavior:\n  get(target, prop, receiver) { return Reflect.get(target, prop, receiver); }"
+  },
+  {
+    "id": "js15",
+    "level": "advanced",
+    "q": "Explain JavaScript memory management and common memory leak patterns.",
+    "a": "JS uses Mark-and-Sweep GC: Starting from roots (globals, stack), marks all reachable objects. Unreachable objects are swept.\n\nCommon memory leak patterns:\n\n1. Unremoved event listeners:\n   el.addEventListener('click', handler);\n   el.remove(); // DOM removed but listener still holds reference\n   // Fix: el.removeEventListener or use AbortController\n\n2. Closure retaining large objects:\n   function setup() {\n     const bigData = fetchHuge();\n     return () => bigData.id; // bigData never GC'd even though only .id needed\n   }\n\n3. Timers not cleared:\n   const id = setInterval(fn, 100); // fn captures component state → leak\n   // Fix: clearInterval(id) in cleanup\n\n4. Global variables:\n   window.myCache = hugeArray; // lives forever\n\n5. Detached DOM nodes: Remove from DOM but keep JS reference.\n\nDetect: Chrome DevTools → Memory → Heap Snapshot, Allocation Timeline.\nWeakMap/WeakRef: Hold weak references that don't prevent GC."
+  },
+  {
+    "id": "js16",
+    "level": "intermediate",
+    "q": "What are JavaScript modules (ESM vs CommonJS)? What is tree shaking?",
+    "a": "CommonJS (Node.js, older):\n  const express = require(\"express\"); // synchronous\n  module.exports = { myFn };\n\nES Modules (ESM, browser + modern Node):\n  import express from \"express\"; // async, static analysis possible\n  export const myFn = () => {};\n  export default MyClass;\n\nKey differences:\n  CJS: Synchronous, dynamic (can require in conditions), no tree shaking.\n  ESM: Async, static (imports at top level only), enables tree shaking.\n\nNamed vs default exports:\n  // Named: import { useState, useEffect } from 'react';\n  // Default: import React from 'react';\n  // Both: import React, { useState } from 'react';\n\nTree shaking: Bundler (Webpack, Rollup, Vite) removes unused exports from final bundle.\n  // You import only { debounce } from lodash-es → only debounce shipped, not all of lodash.\n  // Only works with ESM (static analysis of import/export).\n  // CJS: require() is dynamic — bundler can't know what's used.\n\nSide effects: package.json \"sideEffects\": false tells bundler the package is tree-shakeable."
+  },
+  {
+    "id": "js17",
+    "level": "advanced",
+    "q": "What is the difference between Object.freeze, Object.seal, and Object.preventExtensions?",
+    "a": "Object.preventExtensions: Cannot ADD new properties. Can modify/delete existing.\nObject.seal: Cannot ADD or DELETE. Can modify values. Properties become non-configurable.\nObject.freeze: Cannot ADD, DELETE, or MODIFY. Shallow only — nested objects NOT frozen.\n\n  const obj = { a: 1, nested: { b: 2 } };\n  Object.freeze(obj);\n  obj.a = 99;         // silently fails (TypeError in strict mode)\n  obj.nested.b = 99;  // ✅ nested NOT frozen!\n\nDeep freeze:\n  function deepFreeze(obj) {\n    Object.values(obj).forEach(v => v && typeof v === 'object' && deepFreeze(v));\n    return Object.freeze(obj);\n  }\n\nCheck: Object.isFrozen(), Object.isSealed(), Object.isExtensible()."
+  },
+  {
+    "id": "js18",
+    "level": "intermediate",
+    "q": "What are iterators and the iterable protocol in JavaScript?",
+    "a": "Iterable: Object implementing [Symbol.iterator]() that returns an iterator.\nIterator: Object with a .next() method returning { value, done }.\n\nBuilt-in iterables: Array, String, Map, Set, arguments, NodeList, generators.\n\nCustom iterable:\n  const range = {\n    from: 1, to: 5,\n    [Symbol.iterator]() {\n      let current = this.from;\n      const last = this.to;\n      return {\n        next() {\n          return current <= last\n            ? { value: current++, done: false }\n            : { value: undefined, done: true };\n        }\n      };\n    }\n  };\n  for (const num of range) console.log(num); // 1 2 3 4 5\n  const arr = [...range]; // [1, 2, 3, 4, 5]\n\nfor...of works with any iterable.\nSpread (...), destructuring, Array.from all use the iterable protocol.\nfor...in: Iterates over enumerable property KEYS (different — avoid for arrays)."
+  },
+  {
+    "id": "js19",
+    "level": "advanced",
+    "q": "What is tail call optimization (TCO)? How does it affect recursion in JavaScript?",
+    "a": "Tail call: A function call that is the last operation in a function.\n\n  function factorial(n, acc = 1) {\n    if (n <= 1) return acc;\n    return factorial(n - 1, n * acc); // tail call — no work after it returns\n  }\n\nTCO: Engine reuses the current stack frame for a tail call instead of adding a new one.\nBenefit: Recursive functions with tail calls run in O(1) stack space — no stack overflow.\n\nWithout TCO (non-tail call):\n  function factorial(n) {\n    if (n <= 1) return 1;\n    return n * factorial(n - 1); // NOT a tail call — must wait for result to multiply\n  }\n  factorial(100000); // Stack overflow!\n\nTCO in JavaScript:\n- ES2015 spec mandates TCO in strict mode.\n- Reality: Only Safari implements it. V8 (Chrome/Node) does NOT.\n- So in practice, deep recursion in Node.js still overflows.\n\nWorkaround for Node.js: Use trampolining (convert recursion to iteration manually).\n  function trampoline(fn) {\n    return (...args) => {\n      let result = fn(...args);\n      while (typeof result === 'function') result = result();\n      return result;\n    };\n  }"
+  },
+  {
+    "id": "js20",
+    "level": "intermediate",
+    "q": "What is Symbol in JavaScript? When would you use it?",
+    "a": "Symbol: Primitive type that is always unique. Created with Symbol().\n\n  const s1 = Symbol(\"description\");\n  const s2 = Symbol(\"description\");\n  s1 === s2; // false — always unique even with same description\n\nUse as unique property key (no collision with string keys):\n  const ID = Symbol(\"id\");\n  class User {\n    [ID] = Math.random(); // private-ish, not enumerable in for...in\n    getId() { return this[ID]; }\n  }\n\nWell-known symbols (hooks into JS engine):\n  Symbol.iterator    — makes object iterable (for...of)\n  Symbol.toPrimitive — custom type conversion\n  Symbol.hasInstance — customize instanceof\n  Symbol.toStringTag — customize Object.prototype.toString\n\nGlobal symbol registry (shared across realms):\n  const s = Symbol.for(\"shared\"); // creates or retrieves from registry\n  Symbol.keyFor(s); // \"shared\"\n\nSymbols are NOT enumerable: Object.keys(), JSON.stringify() skip them.\nAccess: Object.getOwnPropertySymbols() or Reflect.ownKeys()."
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "rx1",
+    "level": "beginner",
+    "q": "What problem does Redux solve? Explain the three core principles.",
+    "a": "Redux solves prop drilling and cross-component state sharing by centralizing state.\n\nThree principles:\n1. Single source of truth: One global store holds all application state.\n2. State is read-only: The only way to change state is to dispatch an action.\n3. Changes via pure functions: Reducers are pure functions — (state, action) => newState.\n\nData flow: UI dispatches action → Reducer produces new state → Store notifies → UI re-renders.\n\nWhen to use Redux:\n- State is needed by many unrelated components.\n- Complex state transitions with many actions.\n- Need time-travel debugging / logging middleware."
+  },
+  {
+    "id": "rx2",
+    "level": "intermediate",
+    "q": "Explain Redux Toolkit (RTK) — createSlice, createAsyncThunk, and RTK Query.",
+    "a": "Redux Toolkit is the official, opinionated way to write Redux (eliminates boilerplate).\n\ncreateSlice: Combines actions + reducer:\n  const counterSlice = createSlice({\n    name: 'counter',\n    initialState: { value: 0 },\n    reducers: {\n      increment: state => { state.value++; }, // uses Immer internally — can \"mutate\"\n      incrementBy: (state, action) => { state.value += action.payload; }\n    }\n  });\n  export const { increment, incrementBy } = counterSlice.actions;\n\ncreateAsyncThunk: For async operations:\n  const fetchUser = createAsyncThunk('user/fetch', async (id) => {\n    const res = await api.get('/user/' + id);\n    return res.data;\n  });\n  // Generates pending/fulfilled/rejected action types.\n\nRTK Query: Automatic caching, invalidation, polling — replaces most of axios + slice:\n  const api = createApi({ endpoints: builder => ({\n    getUser: builder.query({ query: id => '/users/' + id })\n  })});"
+  },
+  {
+    "id": "rx3",
+    "level": "intermediate",
+    "q": "What is the difference between useSelector and useDispatch?",
+    "a": "useSelector: Reads data from the Redux store.\n  const count = useSelector(state => state.counter.value);\n  // Re-renders only when the selected value changes (shallow compare).\n  // Use createSelector (reselect) for memoized selectors when computing derived data.\n\nuseDispatch: Returns the dispatch function to send actions to the store.\n  const dispatch = useDispatch();\n  dispatch(increment());\n  dispatch(fetchUser(42)); // thunk\n\nMemoized selector with reselect:\n  const selectFilteredItems = createSelector(\n    [state => state.items, state => state.filter],\n    (items, filter) => items.filter(i => i.category === filter) // only recomputes if inputs change\n  );"
+  },
+  {
+    "id": "rx4",
+    "level": "advanced",
+    "q": "How does Redux middleware work? Write a custom logger middleware.",
+    "a": "Middleware sits between dispatch and reducer, enabling side effects (logging, async, routing).\n\nMiddleware signature: store => next => action => { ... next(action) ... }\n\nCustom logger middleware:\n  const loggerMiddleware = store => next => action => {\n    console.group(action.type);\n    console.log('prev state:', store.getState());\n    console.log('action:', action);\n    const result = next(action); // pass to next middleware / reducer\n    console.log('next state:', store.getState());\n    console.groupEnd();\n    return result;\n  };\n\nAdding to store:\n  const store = configureStore({\n    reducer: rootReducer,\n    middleware: getDefault => getDefault().concat(loggerMiddleware)\n  });\n\nPopular middlewares: redux-thunk (built-in to RTK), redux-saga, redux-observable."
+  },
+  {
+    "id": "rx5",
+    "level": "advanced",
+    "q": "Explain the Redux Saga pattern and when to choose it over Thunks.",
+    "a": "Redux Saga uses ES6 generators to handle complex async workflows as a separate \"saga\" thread.\n\n  function* watchFetchUser() {\n    yield takeLatest('user/fetch', fetchUserSaga);\n  }\n  function* fetchUserSaga(action) {\n    try {\n      const user = yield call(api.getUser, action.payload);\n      yield put({ type: 'user/set', payload: user });\n    } catch (e) {\n      yield put({ type: 'user/error', payload: e.message });\n    }\n  }\n\nEffects: call (invoke fn), put (dispatch), take (wait for action), takeLatest (cancel prev), all (parallel), race.\n\nChoose Saga over Thunk when:\n- Complex async flows: retry logic, debounce, polling, sequences.\n- Need to cancel in-flight requests (takeLatest).\n- Side effects are hard to test with thunks.\n- WebSocket flows.\n\nChoose Thunk (RTK) for simple fetch + store patterns."
+  }
+]

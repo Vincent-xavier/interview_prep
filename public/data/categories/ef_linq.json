@@ -1,0 +1,44 @@
+[
+  {
+    "id": "ef1",
+    "level": "beginner",
+    "q": "What is Entity Framework Core? Explain Code-First vs Database-First approaches.",
+    "a": "EF Core is an ORM (Object-Relational Mapper) that maps C# classes to database tables.\n\nCode-First:\n- You write C# entity classes and DbContext.\n- EF generates migrations to create/update the database.\n- Preferred in greenfield projects; schema controlled by code.\n\n  public class Order {\n    public int Id { get; set; }\n    public string Status { get; set; }\n    public List<OrderItem> Items { get; set; }\n  }\n  public class AppDbContext : DbContext {\n    public DbSet<Order> Orders { get; set; }\n  }\n\nDatabase-First:\n- DB already exists; scaffold generates entity classes from schema.\n  dotnet ef dbcontext scaffold \"ConnectionString\" Microsoft.EntityFrameworkCore.SqlServer\n\nMigration workflow:\n  dotnet ef migrations add AddStatusIndex\n  dotnet ef database update"
+  },
+  {
+    "id": "ef2",
+    "level": "intermediate",
+    "q": "Explain eager loading, lazy loading, and explicit loading in EF Core.",
+    "a": "Eager Loading: Load related data in the same query using Include().\n  var orders = db.Orders\n    .Include(o => o.Customer)\n    .Include(o => o.Items)\n      .ThenInclude(i => i.Product)\n    .ToList(); // One SQL with JOINs\n\nLazy Loading: Related data loads automatically when accessed (requires proxies + virtual properties).\n  // Install: Microsoft.EntityFrameworkCore.Proxies\n  services.AddDbContext<Db>(opt => opt.UseLazyLoadingProxies());\n  // Each access to order.Customer fires a new SQL — N+1 risk!\n\nExplicit Loading: Manual control — load only when you need it.\n  var order = db.Orders.Find(1);\n  db.Entry(order).Reference(o => o.Customer).Load();\n  db.Entry(order).Collection(o => o.Items).Load();\n\nBest practice: Use eager loading for known needs; avoid lazy loading in loops (N+1 queries)."
+  },
+  {
+    "id": "ef3",
+    "level": "intermediate",
+    "q": "What are EF Core migrations and how do you manage them in production?",
+    "a": "Migrations: Version-controlled incremental changes to the database schema.\n\nCreate migration:\n  dotnet ef migrations add AddUserPhoneNumber\n  -- Generates: Up() (apply) and Down() (rollback) methods\n\nApply:\n  dotnet ef database update\n  // Or programmatically on startup:\n  await db.Database.MigrateAsync();\n\nProduction migration strategy:\n1. Generate SQL script from migrations (review before applying):\n   dotnet ef migrations script --idempotent > migration.sql\n2. Apply via DBA or deployment pipeline (Azure DevOps/GitHub Actions).\n3. Use --idempotent flag so script is safe to run multiple times.\n4. Never run migrations automatically in high-traffic production without review.\n\nRollback: dotnet ef database update PreviousMigrationName\nRemove last migration (if not applied): dotnet ef migrations remove"
+  },
+  {
+    "id": "ef4",
+    "level": "intermediate",
+    "q": "How do you use raw SQL with EF Core and when should you?",
+    "a": "EF Core supports raw SQL for complex queries that LINQ can't express efficiently.\n\nFromSqlRaw / FromSqlInterpolated (returns entities):\n  var orders = await db.Orders\n    .FromSqlInterpolated($\"SELECT * FROM Orders WHERE customer_id = {customerId}\")\n    .Include(o => o.Items)\n    .ToListAsync();\n\nExecuteSqlRaw / ExecuteSqlInterpolated (for non-select):\n  await db.Database.ExecuteSqlInterpolatedAsync(\n    $\"UPDATE Orders SET status = {status} WHERE id = {orderId}\"\n  );\n\nSqlQueryRaw (EF 7+ — for non-entity results):\n  var result = db.Database.SqlQuery<OrderSummaryDto>(\n    $\"SELECT customer_id, COUNT(*) as total FROM Orders GROUP BY customer_id\"\n  ).ToList();\n\nWhen to use:\n- Complex reporting queries that generate poor LINQ SQL.\n- Stored procedures / functions.\n- Bulk operations (also consider EFCore.BulkExtensions).\n- Always prefer interpolated variants for parameterization (SQL injection safety)."
+  },
+  {
+    "id": "ef5",
+    "level": "advanced",
+    "q": "What are global query filters in EF Core? Give a practical use case.",
+    "a": "Global query filters automatically add a WHERE clause to every query on an entity type.\n\nRegistration in OnModelCreating:\n  modelBuilder.Entity<Product>()\n    .HasQueryFilter(p => !p.IsDeleted); // soft-delete filter\n  \n  modelBuilder.Entity<Order>()\n    .HasQueryFilter(o => o.TenantId == _currentTenantId); // multi-tenancy\n\nEffect:\n  db.Products.ToList() // generates: SELECT * FROM Products WHERE IsDeleted = false\n  db.Products.Find(1)  // also filtered\n\nBypass the filter:\n  db.Products.IgnoreQueryFilters().ToList(); // see all including deleted\n\nUse cases:\n- Soft deletes (IsDeleted flag).\n- Multi-tenancy (TenantId filter).\n- Published/active record filtering.\n\nCaution: The filter is always applied unless explicitly ignored — be aware in admin contexts."
+  },
+  {
+    "id": "ef6",
+    "level": "advanced",
+    "q": "How do you handle concurrency conflicts in EF Core?",
+    "a": "Concurrency conflict: Two users try to update the same record simultaneously.\n\nOptimistic Concurrency (preferred):\n1. Add a rowversion/concurrency token to the entity:\n  public byte[] RowVersion { get; set; }  // SQL Server\n  [Timestamp] public byte[] RowVersion { get; set; }\n  // PostgreSQL: use xmin column or a GUID/datetime token.\n\n2. EF includes it in WHERE clause:\n  UPDATE Orders SET Status=@s WHERE Id=@id AND RowVersion=@rv\n  -- If another update happened, RowVersion changed → 0 rows affected → exception.\n\n3. Catch and resolve:\n  try {\n    await db.SaveChangesAsync();\n  } catch (DbUpdateConcurrencyException ex) {\n    var entry = ex.Entries.First();\n    var dbValues = await entry.GetDatabaseValuesAsync();\n    // Option A: Last-write-wins: entry.OriginalValues.SetValues(dbValues);\n    // Option B: Notify user to review conflict.\n  }\n\nPessimistic Concurrency: Use raw SQL SELECT FOR UPDATE to lock rows. Rare in EF Core."
+  },
+  {
+    "id": "ef7",
+    "level": "expert",
+    "q": "What are EF Core interceptors and how can you use them?",
+    "a": "Interceptors allow hooking into EF Core operations (commands, connections, transactions, etc.) without modifying DbContext.\n\nTypes: IDbCommandInterceptor, IDbConnectionInterceptor, IDbTransactionInterceptor, ISaveChangesInterceptor.\n\nExample — query logging interceptor:\n  public class SlowQueryInterceptor : DbCommandInterceptor {\n    public override DbDataReader ReaderExecuted(\n      DbCommand command, CommandExecutedEventData data, DbDataReader result) {\n      if (data.Duration.TotalMilliseconds > 500)\n        Log.Warning(\"Slow query ({ms}ms): {sql}\", data.Duration.TotalMilliseconds, command.CommandText);\n      return base.ReaderExecuted(command, data, result);\n    }\n  }\n\nISaveChangesInterceptor — for auditing:\n  public override ValueTask<InterceptionResult<int>> SavingChangesAsync(...) {\n    foreach (var entry in context.ChangeTracker.Entries<IAuditable>())\n      entry.Entity.UpdatedAt = DateTime.UtcNow;\n    return base.SavingChangesAsync(...);\n  }\n\nRegister:\n  services.AddDbContext<Db>(opt => opt.AddInterceptors(new SlowQueryInterceptor()));\n\nUse cases: Audit logging, query performance monitoring, soft-delete on SaveChanges, multi-tenancy header injection."
+  }
+]

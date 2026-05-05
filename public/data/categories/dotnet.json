@@ -1,0 +1,92 @@
+[
+  {
+    "id": "dn1",
+    "level": "beginner",
+    "q": "What is the difference between value types and reference types in C#?",
+    "a": "Value types (struct, int, bool, double, DateTime, enum):\n- Stored on the stack (usually).\n- Copied on assignment — changes don't affect original.\n  int a = 5; int b = a; b = 10; // a is still 5\n\nReference types (class, interface, delegate, string, arrays):\n- Stored on the heap; variable holds a reference (pointer).\n- Assignment copies the reference — both variables point to same object.\n  var a = new List<int>(); var b = a; b.Add(1); // a also has 1\n\nExceptions:\n- string is immutable reference type but behaves like value type.\n- Boxing: wrapping value type in object (heap allocation).\n- Structs on heap when inside class or boxed.\n\nC# 9+ record struct: Value-type records with value equality."
+  },
+  {
+    "id": "dn2",
+    "level": "beginner",
+    "q": "What is async/await in C# and how does it work under the hood?",
+    "a": "async/await lets you write asynchronous code that looks synchronous.\n\n  public async Task<string> FetchDataAsync() {\n    var response = await httpClient.GetAsync(url); // doesn't block thread\n    var content = await response.Content.ReadAsStringAsync();\n    return content;\n  }\n\nUnder the hood:\n- Compiler transforms async method into a state machine (IAsyncStateMachine).\n- await suspends the method and returns the current thread to the pool.\n- When the awaited task completes, execution resumes (possibly on a different thread).\n\nKey types: Task (no return), Task<T> (with return), ValueTask<T> (stack-allocated for hot paths).\n\nCommon mistakes:\n- async void (can't be awaited, exceptions go unhandled) — only for event handlers.\n- .Result or .Wait() causes deadlocks in sync contexts.\n- Forgetting await drops the exception silently."
+  },
+  {
+    "id": "dn3",
+    "level": "beginner",
+    "q": "What is a delegate, Action, and Func in C#?",
+    "a": "Delegate: A type-safe function pointer.\n  delegate int MathOp(int a, int b);\n  MathOp add = (a, b) => a + b;\n  add(3, 4); // 7\n\nAction<T>: Built-in delegate with void return.\n  Action<string> print = msg => Console.WriteLine(msg);\n\nFunc<T, TResult>: Built-in delegate that returns a value.\n  Func<int, int, int> add = (a, b) => a + b;\n\nFunc<string, bool> isLong = s => s.Length > 10;\n\nEvents use delegates: event Action<string> OnUserAdded;\n\nLambda captures: Closures can capture outer variables (be careful of loop variable capture bugs)."
+  },
+  {
+    "id": "dn4",
+    "level": "intermediate",
+    "q": "Explain IEnumerable vs IQueryable — and when does LINQ query execute?",
+    "a": "IEnumerable<T>:\n- Works with in-memory collections.\n- LINQ operations execute in-memory after data is loaded.\n- Extension methods from System.Linq.\n  var result = list.Where(x => x.Age > 18); // executes on the C# object graph\n\nIQueryable<T>:\n- Works with out-of-process data (EF Core, LINQ to SQL).\n- Builds an expression tree; actual SQL is only generated and sent to DB when enumerated.\n- Extension methods from System.Linq.Queryable.\n  var result = dbContext.Users.Where(x => x.Age > 18); // SQL: WHERE Age > 18\n\nDeferred execution: LINQ queries don't run until you enumerate (foreach, .ToList(), .FirstOrDefault()).\nImmediate execution: .ToList(), .Count(), .Sum(), .First() force execution immediately.\n\nKey rule: Keep IQueryable for DB queries to avoid loading all data into memory."
+  },
+  {
+    "id": "dn5",
+    "level": "intermediate",
+    "q": "What is Dependency Injection in .NET Core? How is it configured?",
+    "a": ".NET Core has a built-in DI container. Services are registered in Program.cs (or Startup.cs).\n\nLifetimes:\n- Transient: New instance per injection. For lightweight, stateless services.\n- Scoped: One instance per HTTP request. Ideal for DbContext.\n- Singleton: One instance for app lifetime. For caches, configuration.\n\nRegistration:\n  builder.Services.AddTransient<IEmailService, EmailService>();\n  builder.Services.AddScoped<IOrderRepository, OrderRepository>();\n  builder.Services.AddSingleton<ICacheService, MemoryCacheService>();\n\nConstructor injection (preferred):\n  public class OrderController(IOrderRepository repo, IEmailService email) {}\n\nService locator (anti-pattern — avoid):\n  var svc = httpContext.RequestServices.GetService<IEmailService>();\n\nNever inject Scoped into Singleton (captive dependency) — leads to stale instances."
+  },
+  {
+    "id": "dn6",
+    "level": "intermediate",
+    "q": "What are C# records and how do they differ from classes?",
+    "a": "Records (C# 9+) are reference types (record class) or value types (record struct) with:\n- Value-based equality (==, Equals compare all properties).\n- Immutability by default (init-only properties).\n- with expression for non-destructive mutation.\n- Built-in ToString (prints all properties).\n\n  record User(string Name, int Age);\n  var u1 = new User(\"Alice\", 30);\n  var u2 = u1 with { Age = 31 }; // new record, u1 unchanged\n  Console.WriteLine(u1 == u2); // false (value equality)\n\n  record struct Point(int X, int Y); // value type record\n\nvs Class:\n- Class: reference equality by default, mutable, no with expression.\n- Record: value equality, immutable by default, with expression.\n\nUse records for: DTOs, value objects, immutable data models."
+  },
+  {
+    "id": "dn7",
+    "level": "advanced",
+    "q": "Explain generics constraints in C# — where T : class, new(), interface, struct.",
+    "a": "Generic constraints restrict what types T can be:\n\n  public class Repository<T> where T : class, IEntity, new()\n  {\n    public T Create() => new T(); // possible because of new()\n  }\n\nCommon constraints:\n- where T : class — T must be a reference type.\n- where T : struct — T must be a value type (non-nullable).\n- where T : new() — T must have a parameterless constructor.\n- where T : SomeClass — T must inherit from SomeClass.\n- where T : ISomeInterface — T must implement the interface.\n- where T : notnull — T cannot be nullable.\n- where T : unmanaged — T must be an unmanaged type (for Span<T>/unsafe).\n\nMultiple constraints:\n  where T : class, IComparable<T>, new()\n\nUse constraints to gain access to members of T without reflection or boxing."
+  },
+  {
+    "id": "dn8",
+    "level": "advanced",
+    "q": "What is Span<T> and Memory<T>? When would you use them?",
+    "a": "Span<T>: A ref struct that represents a contiguous memory region (stack, heap, or unmanaged) without allocation.\n  Span<char> slice = someString.AsSpan(0, 5); // no allocation\n  Span<byte> buffer = stackalloc byte[256];    // stack allocation\n\nKey: Cannot be stored on heap, used as field, or used in async methods (ref struct restriction).\n\nMemory<T>: Heap-safe wrapper around a memory region — can be stored, passed across async methods.\n  Memory<byte> mem = new byte[1024];\n  await ProcessAsync(mem); // OK in async\n\nUse cases:\n- Parsing strings/bytes without creating substrings (zero-allocation).\n- High-performance binary serialization.\n- Network buffers (System.IO.Pipelines).\n\nArraySegment<T>: Older alternative — less performant, wraps an array segment."
+  },
+  {
+    "id": "dn9",
+    "level": "advanced",
+    "q": "Explain threading in C# — Task Parallel Library, async/await vs threads, and synchronization primitives.",
+    "a": "Threads: OS-level, expensive (1MB stack), context-switching overhead.\n  new Thread(() => DoWork()).Start();\n\nTask Parallel Library (TPL): Thread pool abstraction.\n  Task.Run(() => DoWork()); // runs on thread pool\n  Parallel.ForEach(items, item => Process(item)); // data parallelism\n\nasync/await: I/O-bound tasks. Doesn't block threads — uses callbacks.\n\nSynchronization primitives:\n- lock / Monitor: Mutual exclusion. Blocking.\n  lock (_lock) { /* critical section */ }\n- SemaphoreSlim: Allow N concurrent threads. Async-compatible.\n  await semaphore.WaitAsync(); try { ... } finally { semaphore.Release(); }\n- ConcurrentDictionary, ConcurrentQueue: Thread-safe collections.\n- Interlocked: Atomic operations (increment, compare-exchange).\n\nCommon pitfalls: Deadlocks (circular locks), race conditions, capturing non-thread-safe objects in Tasks."
+  },
+  {
+    "id": "dn10",
+    "level": "expert",
+    "q": "What are C# source generators and how do they work?",
+    "a": "Source generators run at compile time to produce additional C# code based on the existing code.\n\nHow they work:\n1. A class implementing ISourceGenerator (or IIncrementalGenerator) is compiled into an analyzer DLL.\n2. The Roslyn compiler runs it during compilation.\n3. The generator receives a Compilation object (full syntax tree).\n4. It adds new source files to the compilation.\n\nUse cases:\n- Auto-generate boilerplate (INotifyPropertyChanged, serialization, API clients).\n- AutoMapper alternatives.\n- Compile-time dependency injection (Jab, StrongInject).\n- System.Text.Json's source-gen mode (AOT-friendly).\n\nExample: [GenerateMapper] attribute on a class → generator outputs a MapTo() extension method.\n\nBenefits: Zero runtime reflection, AOT-compatible, faster startup."
+  },
+  {
+    "id": "dn11",
+    "level": "intermediate",
+    "q": "What are extension methods in C#? When and how do you use them?",
+    "a": "Extension methods add methods to existing types without modifying them or inheriting from them.\n\nSyntax: static method in static class, with \"this\" before first parameter.\n  public static class StringExtensions {\n    public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);\n    public static string ToPascalCase(this string s) =>\n      string.IsNullOrEmpty(s) ? s : char.ToUpper(s[0]) + s[1..].ToLower();\n  }\n\n  // Usage:\n  \"hello\".ToPascalCase(); // \"Hello\"\n  string? name = null;\n  name.IsNullOrEmpty();   // true (no NullReferenceException — this can be null)\n\nLINQ is entirely built on extension methods for IEnumerable<T>.\n\nGood uses:\n- Adding helpers to third-party / sealed types.\n- Fluent API building (method chaining).\n- Domain-specific helpers on primitive types.\n\nAvoid: Don't use for core business logic — hard to discover, can clutter intellisense."
+  },
+  {
+    "id": "dn12",
+    "level": "intermediate",
+    "q": "What is the difference between abstract class and interface in C#? When to use each?",
+    "a": "Interface (C# 8+ can have default implementations):\n- Defines a contract — WHAT to do, not HOW.\n- A class can implement multiple interfaces.\n- No fields (only properties), no constructors.\n- Use when: Defining capability across unrelated types (IDisposable, IComparable, ISerializable).\n\nAbstract class:\n- Can have fields, constructors, implemented methods, abstract methods.\n- Single inheritance only.\n- Use when: Shared base implementation across related types; template method pattern.\n\n  abstract class Animal {\n    public abstract string Speak(); // must implement\n    public void Sleep() => Console.WriteLine(\"Zzz\"); // shared implementation\n  }\n\nDecision guide:\n- \"Can do\" relationship → interface (IFlyable, ISwimmable).\n- \"Is a\" relationship with shared code → abstract class (Animal → Dog, Cat).\n- Both? Implement interface, use abstract class as default implementation base.\n\nC# 8 default interface methods blur this distinction — but abstract classes are still preferred for shared state."
+  },
+  {
+    "id": "dn13",
+    "level": "advanced",
+    "q": "Explain C# pattern matching — switch expressions, property patterns, positional patterns.",
+    "a": "Pattern matching (C# 7-11+) lets you match values against patterns in a readable, exhaustive way.\n\nType pattern:\n  if (shape is Circle c) { return Math.PI * c.Radius * c.Radius; }\n\nSwitch expression (C# 8):\n  double area = shape switch {\n    Circle c      => Math.PI * c.Radius * c.Radius,\n    Rectangle r   => r.Width * r.Height,\n    null          => throw new ArgumentNullException(),\n    _             => throw new NotSupportedException()\n  };\n\nProperty pattern (C# 8):\n  string classify = order switch {\n    { Status: \"Pending\", Total: > 1000 } => \"High-value pending\",\n    { Status: \"Paid\" }                   => \"Paid order\",\n    _                                    => \"Other\"\n  };\n\nPositional pattern (deconstruct):\n  var result = point switch {\n    (0, 0) => \"Origin\",\n    (var x, 0) => $\"X-axis at {x}\",\n    (0, var y) => $\"Y-axis at {y}\",\n    var (x, y) => $\"Point({x},{y})\"\n  };\n\nList patterns (C# 11):\n  int[] arr = { 1, 2, 3 };\n  bool match = arr is [1, .., 3]; // true"
+  },
+  {
+    "id": "dn14",
+    "level": "advanced",
+    "q": "What is the IOptions pattern in .NET Core? How do you bind configuration?",
+    "a": "IOptions<T> pattern cleanly binds appsettings.json sections to strongly-typed POCOs.\n\nappsettings.json:\n  {\n    \"EmailSettings\": {\n      \"SmtpHost\": \"smtp.gmail.com\",\n      \"Port\": 587,\n      \"FromAddress\": \"no-reply@app.com\"\n    }\n  }\n\nPOCO:\n  public class EmailSettings {\n    public string SmtpHost { get; set; } = \"\";\n    public int Port { get; set; }\n    public string FromAddress { get; set; } = \"\";\n  }\n\nRegistration (Program.cs):\n  builder.Services.Configure<EmailSettings>(\n    builder.Configuration.GetSection(\"EmailSettings\"));\n\nUsage in service:\n  public class EmailService(IOptions<EmailSettings> opts) {\n    private readonly EmailSettings _settings = opts.Value;\n  }\n\nVariants:\n- IOptions<T>: Singleton — reads once at startup.\n- IOptionsSnapshot<T>: Scoped — re-reads per request (for reloadOnChange).\n- IOptionsMonitor<T>: Singleton with change notification (hot reload).\n\nValidation: Add [Required], [Range] on the POCO and call\n  services.AddOptions<EmailSettings>().BindConfiguration(\"EmailSettings\").ValidateDataAnnotations();"
+  },
+  {
+    "id": "dn15",
+    "level": "expert",
+    "q": "Explain the difference between Task, ValueTask, and IAsyncEnumerable in C#.",
+    "a": "Task<T>:\n- Always allocates a heap object.\n- Use for most async operations.\n- Safe to await multiple times.\n\nValueTask<T> (C# 5.1+):\n- Stack-allocated when result is available synchronously (common in caching, hot paths).\n- Avoids heap allocation for the happy path.\n- Should only be awaited ONCE (not stored and awaited later).\n  public ValueTask<User?> GetUserAsync(int id) {\n    if (_cache.TryGetValue(id, out var user)) return new ValueTask<User?>(user); // no alloc!\n    return new ValueTask<User?>(FetchFromDbAsync(id));\n  }\n\nIAsyncEnumerable<T> (C# 8+):\n- Async streaming — yields items one at a time without loading all into memory.\n  async IAsyncEnumerable<Order> StreamOrdersAsync([EnumeratorCancellation] CancellationToken ct) {\n    await foreach (var batch in db.Orders.AsAsyncEnumerable().WithCancellation(ct))\n      yield return batch;\n  }\n  // Consumer:\n  await foreach (var order in StreamOrdersAsync(ct)) Process(order);\n\nUse IAsyncEnumerable for: Large dataset streaming, real-time data feeds, paginated APIs where you process as you go."
+  }
+]

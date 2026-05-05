@@ -1,0 +1,50 @@
+[
+  {
+    "id": "ts1",
+    "level": "beginner",
+    "q": "What is the difference between type and interface in TypeScript?",
+    "a": "Both define shapes but have key differences:\n\nInterface:\n- Extends via \"extends\" keyword.\n- Can be reopened (declaration merging — add new members later).\n- Better for defining object shapes / class contracts.\n  interface User { name: string; }\n  interface User { age: number; } // ✅ Merges to { name, age }\n\nType Alias:\n- Uses \"=\" assignment.\n- Can represent primitives, unions, tuples, mapped types.\n- Cannot be reopened/merged.\n  type ID = string | number; // ✅ Union — only possible with type\n\nRule of thumb: Use interface for objects/classes; use type for unions, primitives, complex types."
+  },
+  {
+    "id": "ts2",
+    "level": "beginner",
+    "q": "What are generics in TypeScript? Give a practical example.",
+    "a": "Generics allow you to write reusable code that works with multiple types while keeping type safety.\n\nWithout generics:\n  function identity(x: any): any { return x; } // loses type info\n\nWith generics:\n  function identity<T>(x: T): T { return x; }\n  const num = identity<number>(42); // T = number, returns number\n  const str = identity(\"hello\");    // T inferred as string\n\nGeneric constraints:\n  function getLength<T extends { length: number }>(arg: T): number {\n    return arg.length;\n  }\n  getLength(\"hello\"); // ✅  getLength(42); // ❌\n\nGeneric interfaces:\n  interface ApiResponse<T> { data: T; status: number; }\n  const res: ApiResponse<User[]> = await fetchUsers();"
+  },
+  {
+    "id": "ts3",
+    "level": "intermediate",
+    "q": "Explain TypeScript utility types: Partial, Required, Pick, Omit, Record, Readonly.",
+    "a": "Partial<T>: All properties become optional.\n  Partial<User> → { name?: string; age?: number }\n\nRequired<T>: All optional properties become required.\n\nPick<T, K>: Keep only specified keys.\n  Pick<User, \"name\" | \"email\"> → { name: string; email: string }\n\nOmit<T, K>: Remove specified keys.\n  Omit<User, \"password\"> → User without password\n\nRecord<K, V>: Creates object type with keys K and values V.\n  Record<string, number> → { [key: string]: number }\n  Record<\"admin\"|\"user\", Permission[]>\n\nReadonly<T>: All properties become readonly (compile-time only).\n\nReturnType<T>: Extracts return type of a function.\n  ReturnType<typeof fetchUser> → Promise<User>\n\nThese are all implemented using mapped types and conditional types internally."
+  },
+  {
+    "id": "ts4",
+    "level": "intermediate",
+    "q": "What are Union and Intersection types? When to use each?",
+    "a": "Union type (|): Value can be ONE of the listed types.\n  type ID = string | number;\n  type Status = \"active\" | \"inactive\" | \"pending\";\n\nIntersection type (&): Value MUST satisfy ALL listed types.\n  type Admin = User & { permissions: string[] };\n\nDiscriminated Union (common pattern):\n  type Shape =\n    | { kind: \"circle\"; radius: number }\n    | { kind: \"rect\"; width: number; height: number };\n\n  function area(s: Shape) {\n    if (s.kind === \"circle\") return Math.PI * s.radius ** 2;\n    return s.width * s.height;\n  }\n  \nUse union for OR relationships; intersection for AND (mixins, extending types)."
+  },
+  {
+    "id": "ts5",
+    "level": "intermediate",
+    "q": "What are type guards in TypeScript?",
+    "a": "Type guards narrow a union type within a code block.\n\ntypeof guard:\n  function log(x: string | number) {\n    if (typeof x === \"string\") x.toUpperCase(); // TypeScript knows x is string here\n  }\n\ninstanceof guard:\n  if (error instanceof HttpError) error.statusCode;\n\nin guard (checks if property exists):\n  if (\"email\" in user) user.email; // User | Guest narrowed to User\n\nCustom type predicate:\n  function isUser(x: any): x is User {\n    return typeof x.name === \"string\";\n  }\n\nnever type: After all cases handled, remaining type should be never:\n  function assertNever(x: never): never { throw new Error(\"Unhandled case\"); }"
+  },
+  {
+    "id": "ts6",
+    "level": "advanced",
+    "q": "Explain conditional types and the infer keyword.",
+    "a": "Conditional types: Type-level if-else.\n  T extends U ? TrueType : FalseType\n\nExamples:\n  type IsString<T> = T extends string ? \"yes\" : \"no\";\n  type A = IsString<string>; // \"yes\"\n  type B = IsString<number>; // \"no\"\n\ninfer: Infer a type variable from within a conditional type.\n  type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;\n  \n  type UnpackPromise<T> = T extends Promise<infer U> ? U : T;\n  type A = UnpackPromise<Promise<string>>; // string\n\nDistributive conditional types (applies to each union member):\n  type ToArray<T> = T extends any ? T[] : never;\n  type A = ToArray<string | number>; // string[] | number[]\n  // Wrap in [] to prevent distribution: [T] extends [any] ? T[] : never"
+  },
+  {
+    "id": "ts7",
+    "level": "advanced",
+    "q": "What are mapped types? Build a DeepReadonly type.",
+    "a": "Mapped types iterate over keys of a type and transform them:\n  type Optional<T> = { [K in keyof T]?: T[K] };\n  type Nullable<T> = { [K in keyof T]: T[K] | null };\n\nTemplate literal types (TS 4.1+):\n  type EventNames<T extends string> = `on${Capitalize<T>}`;\n  type A = EventNames<\"click\" | \"hover\">; // \"onClick\" | \"onHover\"\n\nDeepReadonly:\n  type DeepReadonly<T> = {\n    readonly [K in keyof T]: T[K] extends object\n      ? DeepReadonly<T[K]>\n      : T[K];\n  };"
+  },
+  {
+    "id": "ts8",
+    "level": "expert",
+    "q": "Explain variance in TypeScript — covariance, contravariance, and bivariance.",
+    "a": "Variance describes how subtyping of a composed type relates to subtyping of its components.\n\nCovariant (out position — return types): Dog extends Animal → () => Dog extends () => Animal.\n  function getDog(): Dog is assignable to function getAnimal(): Animal ✅\n\nContravariant (in position — parameter types): Animal extends Dog → (dog: Dog) => void extends (animal: Animal) => void.\n  A handler for Animal should accept where a Dog handler is expected — it handles MORE.\n\nBivariant: TypeScript is bivariant for method parameters by default (unsound, for practicality).\n  interface Fn { method(x: string): void; }\n  // Bivariant — both subtype and supertype accepted for method params.\n\nStrict function types (--strictFunctionTypes): Makes function PROPERTIES contravariant (not methods in interfaces).\n  type Fn = (x: string) => void; // strict: contravariant\n  \nUnderstanding variance matters when designing HOFs, event emitters, and complex generic APIs."
+  }
+]

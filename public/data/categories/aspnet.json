@@ -1,0 +1,62 @@
+[
+  {
+    "id": "as1",
+    "level": "beginner",
+    "q": "What is middleware in ASP.NET Core? Explain the request pipeline.",
+    "a": "Middleware: Software components that handle HTTP requests and responses in a pipeline.\n\n  app.UseMiddleware<A>()\n     .UseMiddleware<B>()\n     .UseMiddleware<C>();\n\nRequest flows: A → B → C → endpoint\nResponse flows: C → B → A (reverse)\n\nEach middleware:\n- Receives HttpContext.\n- Can short-circuit (return early) or call next().\n\n  app.Use(async (context, next) => {\n    // before\n    await next.Invoke(context);\n    // after (runs on the way back)\n  });\n\nBuilt-in: UseRouting, UseAuthentication, UseAuthorization, UseStaticFiles, UseCors.\n\nOrder matters: UseAuthentication must come before UseAuthorization."
+  },
+  {
+    "id": "as2",
+    "level": "beginner",
+    "q": "What is model binding and model validation in ASP.NET Core?",
+    "a": "Model binding: Automatically maps HTTP request data (route, query string, body, headers) to action method parameters.\n\n  [HttpPost]\n  public IActionResult Create([FromBody] CreateOrderDto dto) { ... }\n\n  [FromRoute] — from URL route params\n  [FromQuery] — from ?key=val\n  [FromBody]  — from JSON body\n  [FromHeader]— from HTTP headers\n  [FromForm]  — from form data\n\nModel validation via Data Annotations:\n  public class CreateOrderDto {\n    [Required] public string ProductId { get; set; }\n    [Range(1, 100)] public int Quantity { get; set; }\n    [EmailAddress] public string ContactEmail { get; set; }\n  }\n\n  // In controller:\n  if (!ModelState.IsValid) return BadRequest(ModelState);\n  // Or use [ApiController] — automatically returns 400 on validation failure."
+  },
+  {
+    "id": "as3",
+    "level": "intermediate",
+    "q": "What are Action Filters in ASP.NET Core? How do you create a custom one?",
+    "a": "Filters run code before/after specific stages of the request pipeline.\n\nFilter types:\n- Authorization: Run first; short-circuit if unauthorized.\n- Resource: Run after auth, before model binding (for caching).\n- Action: Run before/after action method execution.\n- Exception: Handle unhandled exceptions.\n- Result: Run before/after result execution.\n\nCustom Action Filter:\n  public class LogActionFilter : IActionFilter {\n    public void OnActionExecuting(ActionExecutingContext ctx) {\n      Console.WriteLine(\"Before: \" + ctx.ActionDescriptor.DisplayName);\n    }\n    public void OnActionExecuted(ActionExecutedContext ctx) {\n      Console.WriteLine(\"After: \" + ctx.Result);\n    }\n  }\n\nApply:\n  [ServiceFilter(typeof(LogActionFilter))] // via DI\n  public class OrdersController : ControllerBase {}\n\nRegister: services.AddScoped<LogActionFilter>();\nGlobal: builder.Services.AddControllers(opt => opt.Filters.Add<LogActionFilter>());"
+  },
+  {
+    "id": "as4",
+    "level": "intermediate",
+    "q": "How do you implement API versioning in ASP.NET Core?",
+    "a": "Install: Microsoft.AspNetCore.Mvc.Versioning\n\n  builder.Services.AddApiVersioning(opt => {\n    opt.DefaultApiVersion = new ApiVersion(1, 0);\n    opt.AssumeDefaultVersionWhenUnspecified = true;\n    opt.ReportApiVersions = true; // adds api-supported-versions header\n    opt.ApiVersionReader = ApiVersionReader.Combine(\n      new UrlSegmentApiVersionReader(),    // /api/v1/orders\n      new HeaderApiVersionReader(\"api-version\"), // header: api-version: 1.0\n      new QueryStringApiVersionReader(\"api-version\") // ?api-version=1.0\n    );\n  });\n\nController:\n  [ApiVersion(\"1.0\")]\n  [Route(\"api/v{version:apiVersion}/orders\")]\n  public class OrdersV1Controller : ControllerBase {}\n\n  [ApiVersion(\"2.0\")]\n  [Route(\"api/v{version:apiVersion}/orders\")]\n  public class OrdersV2Controller : ControllerBase {}\n\nBest practice: Default to URL versioning for REST APIs; add header versioning for clients that can't change URLs."
+  },
+  {
+    "id": "as5",
+    "level": "intermediate",
+    "q": "How do you handle global exception handling in ASP.NET Core?",
+    "a": "Approach 1 — UseExceptionHandler middleware:\n  app.UseExceptionHandler(errorApp => {\n    errorApp.Run(async context => {\n      var error = context.Features.Get<IExceptionHandlerFeature>();\n      context.Response.StatusCode = 500;\n      await context.Response.WriteAsJsonAsync(new { error = error?.Error.Message });\n    });\n  });\n\nApproach 2 — Custom exception middleware:\n  public class ExceptionMiddleware(RequestDelegate next, ILogger logger) {\n    public async Task Invoke(HttpContext ctx) {\n      try { await next(ctx); }\n      catch (NotFoundException ex) {\n        ctx.Response.StatusCode = 404;\n        await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });\n      }\n      catch (Exception ex) {\n        logger.LogError(ex, \"Unhandled exception\");\n        ctx.Response.StatusCode = 500;\n        await ctx.Response.WriteAsJsonAsync(new { message = \"An error occurred.\" });\n      }\n    }\n  }\n\nApproach 3 (Minimal API / .NET 8) — IExceptionHandler:\n  public class GlobalExceptionHandler : IExceptionHandler {\n    public async ValueTask<bool> TryHandleAsync(HttpContext ctx, Exception ex, CancellationToken ct) { ... }\n  }"
+  },
+  {
+    "id": "as6",
+    "level": "advanced",
+    "q": "What is Hangfire and how does it compare to IHostedService for background jobs?",
+    "a": "IHostedService / BackgroundService:\n- Built-in .NET mechanism for background work.\n- Good for: Continuous loops, startup tasks, long-running services.\n- No dashboard, no persistence, no retry out of the box.\n  public class MyWorker : BackgroundService {\n    protected override async Task ExecuteAsync(CancellationToken ct) {\n      while (!ct.IsCancellationRequested) {\n        await DoWork(); await Task.Delay(TimeSpan.FromMinutes(1), ct);\n      }\n    }\n  }\n\nHangfire:\n- Full-featured job scheduler with SQL/Redis storage + retry + dashboard.\n- Job types: Fire-and-forget, delayed, recurring (cron), continuations, batches.\n  BackgroundJob.Enqueue(() => emailService.Send(userId)); // fire-and-forget\n  RecurringJob.AddOrUpdate(\"daily-report\", () => service.GenerateReport(), Cron.Daily);\n- Dashboard at /hangfire — see jobs, failures, retries.\n\nChoose IHostedService for: Simple polling, internal work.\nChoose Hangfire for: External job scheduling, retry logic, audit trail, distributed processing."
+  },
+  {
+    "id": "as7",
+    "level": "advanced",
+    "q": "How does SignalR work and what are its transport fallbacks?",
+    "a": "SignalR is a real-time communication library that enables bidirectional communication between server and client.\n\nTransport mechanisms (in preference order):\n1. WebSockets — full duplex, lowest latency.\n2. Server-Sent Events — server push only, unidirectional.\n3. Long Polling — client polls and waits, fallback.\n\nHub (server-side):\n  public class ChatHub : Hub {\n    public async Task SendMessage(string user, string message) {\n      await Clients.All.SendAsync(\"ReceiveMessage\", user, message);\n    }\n    public override Task OnConnectedAsync() { return base.OnConnectedAsync(); }\n  }\n\nClient (JS):\n  const connection = new signalR.HubConnectionBuilder()\n    .withUrl(\"/chatHub\").withAutomaticReconnect().build();\n  connection.on(\"ReceiveMessage\", (user, msg) => updateUI(user, msg));\n  await connection.start();\n  await connection.invoke(\"SendMessage\", \"Alice\", \"Hello\");\n\nScale-out: Use Redis backplane or Azure SignalR Service for multi-server deployments."
+  },
+  {
+    "id": "as8",
+    "level": "expert",
+    "q": "Explain the difference between Output Caching, Response Caching, and In-Memory Caching in ASP.NET Core.",
+    "a": "In-Memory Cache (IMemoryCache):\n- Application-level cache in server memory.\n- You control what to cache, when to expire, eviction policy.\n  cache.Set(\"key\", data, TimeSpan.FromMinutes(5));\n  cache.TryGetValue(\"key\", out Data data);\n\nResponse Caching (HTTP-level):\n- Sets Cache-Control headers; browser/CDN/proxy caches the response.\n- Server may still process the request if cache miss.\n  [ResponseCache(Duration = 60, VaryByHeader = \"Accept\")]\n\nOutput Caching (.NET 7+, server-side):\n- Server caches the full HTTP response in memory.\n- Subsequent requests for same resource served from cache without hitting controller.\n  app.UseOutputCache();\n  [OutputCache(Duration = 60, VaryByQuery = \"page,size\")]\n  \n  // Tag-based invalidation:\n  await cache.EvictByTagAsync(\"products\");\n\nIDistributedCache (Redis/SQL):\n- Multi-server cache sharing (needed for scale-out).\n\nHierarchy: DistributedCache → shared; OutputCache → server-side HTTP; MemoryCache → fast, per-server."
+  },
+  {
+    "id": "as9",
+    "level": "intermediate",
+    "q": "How do you implement health checks in ASP.NET Core?",
+    "a": "Health checks expose /health endpoint for load balancers, Kubernetes probes, and monitoring tools.\n\nBasic setup:\n  builder.Services.AddHealthChecks()\n    .AddNpgsql(connectionString, name: \"postgresql\")         // DB check\n    .AddRedis(redisConnectionString, name: \"redis\")         // Redis check\n    .AddUrlGroup(new Uri(\"https://api.partner.com\"), \"partner-api\"); // HTTP check\n\nMap endpoint:\n  app.MapHealthChecks(\"/health\", new HealthCheckOptions {\n    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse // rich JSON\n  });\n  app.MapHealthChecks(\"/health/live\",  new HealthCheckOptions { Predicate = _ => false }); // liveness\n  app.MapHealthChecks(\"/health/ready\", new HealthCheckOptions {/* all checks */});          // readiness\n\nCustom check:\n  public class InventoryHealthCheck(IInventoryService svc) : IHealthCheck {\n    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext ctx, CancellationToken ct) {\n      var ok = await svc.PingAsync(ct);\n      return ok ? HealthCheckResult.Healthy() : HealthCheckResult.Degraded(\"Inventory slow\");\n    }\n  }\n\nKubernetes probes:\n- Liveness: Is the app alive? (restart if failing)\n- Readiness: Is the app ready for traffic? (remove from LB if failing)"
+  },
+  {
+    "id": "as10",
+    "level": "advanced",
+    "q": "What is minimal API in ASP.NET Core and how does it compare to controller-based APIs?",
+    "a": "Minimal API (ASP.NET Core 6+): Define endpoints with less ceremony — no controller classes.\n\n  var app = WebApplication.Create();\n  app.MapGet(\"/orders/{id}\", async (int id, IOrderService svc) =>\n    await svc.GetByIdAsync(id) is Order o ? Results.Ok(o) : Results.NotFound());\n  app.MapPost(\"/orders\", async (CreateOrderDto dto, IOrderService svc) => {\n    var order = await svc.CreateAsync(dto);\n    return Results.Created($\"/orders/{order.Id}\", order);\n  });\n  app.Run();\n\nPros:\n- Less boilerplate, faster startup, lower memory footprint.\n- Better for microservices / small services.\n- Supports endpoint filters (like action filters).\n\nCons:\n- No built-in model binding helpers like [ApiController] features.\n- Large APIs become messy — use extension methods to split endpoints.\n\nController-based pros:\n- Better for large APIs with many endpoints.\n- [ApiController] auto-validation, problem details.\n- Better code organization at scale.\n\nBest practice: Use minimal APIs for new microservices; controller-based for large enterprise APIs."
+  }
+]

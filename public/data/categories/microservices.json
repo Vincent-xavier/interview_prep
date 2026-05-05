@@ -1,0 +1,44 @@
+[
+  {
+    "id": "ms1",
+    "level": "beginner",
+    "q": "What are microservices and how do they differ from a monolith?",
+    "a": "Monolith: All features in one deployable unit. Simple to develop initially; hard to scale independently; one failure can take down the whole system.\n\nMicroservices: Application split into small, independently deployable services, each owning its data and deployed separately.\n\nKey characteristics:\n- Each service owns one business capability (Orders, Inventory, Users).\n- Services communicate via APIs (REST/gRPC) or events (message queues).\n- Independent technology stacks per service.\n- Independently scalable and deployable.\n\nTradeoffs:\n  Microservices advantages: Independent scaling, fault isolation, team autonomy.\n  Microservices challenges: Distributed system complexity, network latency, distributed transactions, data consistency.\n\nStart with a modular monolith; extract microservices only when you hit team/scaling boundaries."
+  },
+  {
+    "id": "ms2",
+    "level": "intermediate",
+    "q": "What is the API Gateway pattern and what does it solve?",
+    "a": "API Gateway: A single entry point that sits in front of all microservices.\n\nResponsibilities:\n- Request routing to the correct service.\n- Authentication/authorization (offloads from services).\n- Rate limiting & throttling.\n- SSL termination.\n- Request aggregation (BFF pattern — combine multiple service calls for frontend).\n- Load balancing.\n- Logging, monitoring, distributed tracing.\n\nWithout gateway: Client must know all service endpoints + handle auth for each.\nWith gateway: Client talks to one URL; gateway handles complexity.\n\nOptions: Nginx, Kong, YARP (built-in .NET reverse proxy), Azure API Management, AWS API Gateway.\n\nYARP in .NET:\n  // appsettings.json defines routes + clusters → YARP handles proxying."
+  },
+  {
+    "id": "ms3",
+    "level": "intermediate",
+    "q": "What is the Circuit Breaker pattern? Explain its states.",
+    "a": "Circuit Breaker: Prevents cascade failures by stopping requests to a failing service.\n\nStates:\n1. Closed (normal): Requests flow through. Failures counted.\n2. Open (tripped): After threshold failures, circuit opens. All requests fail immediately (fail-fast). No calls to the failing service.\n3. Half-Open (recovery): After timeout, lets a few test requests through.\n   - Success → Close circuit.\n   - Failure → Reopen circuit.\n\nImplementation with Polly (.NET):\n  var pipeline = new ResiliencePipelineBuilder()\n    .AddCircuitBreaker(new CircuitBreakerStrategyOptions {\n      FailureRatio = 0.5,          // 50% failure rate\n      SamplingDuration = TimeSpan.FromSeconds(10),\n      MinimumThroughput = 5,\n      BreakDuration = TimeSpan.FromSeconds(30)\n    })\n    .Build();\n\n  await pipeline.ExecuteAsync(ct => httpClient.GetAsync(\"/inventory/1\", ct), ct);\n\nCombine with retry (retry → circuit breaker) and timeout."
+  },
+  {
+    "id": "ms4",
+    "level": "intermediate",
+    "q": "What is event-driven communication? Compare RabbitMQ vs Azure Service Bus.",
+    "a": "In event-driven microservices, services communicate asynchronously via messages rather than synchronous HTTP calls.\n\nPatterns:\n- Event: \"Something happened\" (OrderCreated, PaymentProcessed).\n- Command: \"Do this\" (SendEmail, ChargeCard).\n- Query: \"Tell me\" (RequestReply pattern).\n\nBroker types:\nRabbitMQ:\n- Open source, AMQP protocol.\n- Exchanges (fanout, direct, topic, headers) → Queues → Consumers.\n- Fast, flexible routing.\n- Requires ops overhead (HA setup, mirroring).\n\nAzure Service Bus:\n- Fully managed PaaS.\n- Queues (point-to-point) and Topics+Subscriptions (pub/sub).\n- Features: Dead-letter queue, sessions, scheduled messages, duplicate detection, message lock.\n- Enterprise-grade; integrates with Azure ecosystem.\n\nMassTransit: .NET library that abstracts RabbitMQ/Service Bus — consistent API regardless of broker."
+  },
+  {
+    "id": "ms5",
+    "level": "advanced",
+    "q": "Explain the Saga pattern — choreography vs orchestration.",
+    "a": "Saga: Manages distributed transactions across microservices without using 2-phase commit.\n\nProblem: \"Place order\" involves Inventory, Payment, Shipping — if Payment fails, need to compensate.\n\nChoreography Saga (event-driven):\n- Services react to events and publish their own.\n- OrderService → OrderCreated → InventoryService → Reserved → PaymentService → Charged → ShippingService.\n- Rollback: PaymentFailed → InventoryService listens → releases reservation.\n- Pros: Decoupled. Cons: Hard to trace, complex failure handling.\n\nOrchestration Saga (centralized):\n- Saga orchestrator (state machine) tells each service what to do.\n- OrderSaga calls: ReserveInventory → if OK, ChargePayment → if OK, CreateShipment.\n- On failure: CallCompensation (ReleaseInventory, RefundPayment).\n- Pros: Explicit flow, easy to trace. Cons: Orchestrator is a central point.\n\nLibraries: MassTransit Saga, NServiceBus, Dapr."
+  },
+  {
+    "id": "ms6",
+    "level": "advanced",
+    "q": "What is CQRS and Event Sourcing? When should you use them?",
+    "a": "CQRS (Command Query Responsibility Segregation):\n- Separate read models from write models.\n- Commands: Change state (no return value or just ID).\n- Queries: Return data (no state changes).\n- Benefits: Independent scaling, optimized read models (denormalized), different databases.\n\nEvent Sourcing:\n- Instead of storing current state, store a sequence of events.\n- State = reduce(events). \n- Example: Instead of { balance: 500 }, store [Deposited(1000), Withdrew(500)].\n- Benefits: Complete audit log, time-travel (replay to any point), event replay for new projections.\n- Drawbacks: Complex queries, eventual consistency, schema evolution of events is hard.\n\nCombined:\n- Commands produce events → stored in event store.\n- Events projected to read-model DB (eventual consistency).\n\nWhen NOT to use: Most CRUD apps, small teams, tight deadlines — significant complexity overhead."
+  },
+  {
+    "id": "ms7",
+    "level": "expert",
+    "q": "What is distributed tracing and how do you implement it in .NET microservices?",
+    "a": "Distributed tracing: Track a request as it flows through multiple services by propagating a trace context.\n\nConcepts:\n- Trace: End-to-end journey of a request across all services.\n- Span: One unit of work within a trace (e.g., one HTTP call or DB query).\n- TraceId: Unique ID for the entire trace.\n- SpanId: Unique ID for each span.\n\nOpenTelemetry (.NET implementation):\n  builder.Services.AddOpenTelemetry()\n    .WithTracing(tracer => tracer\n      .AddAspNetCoreInstrumentation()\n      .AddHttpClientInstrumentation()\n      .AddEntityFrameworkCoreInstrumentation()\n      .AddOtlpExporter(opt => opt.Endpoint = new Uri(\"http://jaeger:4317\")));\n\nPropagation: Trace context (W3C traceparent header) is automatically forwarded in HTTP calls.\n\nExporters: Jaeger, Zipkin, Azure Monitor (Application Insights), Grafana Tempo.\n\nCorrelation IDs in logs: Log the TraceId in structured logs so you can correlate logs + traces.\n  logger.LogInformation(\"Processing order {OrderId}\", orderId); // TraceId auto-attached"
+  }
+]

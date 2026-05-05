@@ -1,0 +1,122 @@
+[
+  {
+    "id": "rx_e1",
+    "level": "intermediate",
+    "q": "What is a Higher-Order Component (HOC)? Give a real use case.",
+    "a": "A HOC is a function that takes a component and returns a new enhanced component.\n\n  function withAuth(WrappedComponent) {\n    return function AuthGuard(props) {\n      const { isAuthenticated } = useAuth();\n      if (!isAuthenticated) return <Navigate to=\"/login\" />;\n      return <WrappedComponent {...props} />;\n    };\n  }\n  const ProtectedDashboard = withAuth(Dashboard);\n\nReal use cases:\n- Authorization checks (withAuth)\n- Analytics/logging (withLogger)\n- Theme injection (withTheme)\n- Data fetching with loading state (withData)\n\nHOC vs Custom Hook:\n- HOC wraps a component tree — affects rendering.\n- Custom hook reuses logic inside a component — no JSX.\n- Prefer custom hooks in modern React (simpler, no wrapper hell).\n\nPitfall: Don't use HOCs inside render — creates a new component type each render."
+  },
+  {
+    "id": "rx_e2",
+    "level": "intermediate",
+    "q": "What are render props? How do they compare to HOCs and hooks?",
+    "a": "Render props: A component accepts a function as a prop and calls it to decide what to render.\n\n  <MouseTracker render={({ x, y }) => <Tooltip x={x} y={y} />} />\n\n  class MouseTracker extends React.Component {\n    state = { x: 0, y: 0 };\n    handleMouseMove = (e) => this.setState({ x: e.clientX, y: e.clientY });\n    render() {\n      return (\n        <div onMouseMove={this.handleMouseMove}>\n          {this.props.render(this.state)}\n        </div>\n      );\n    }\n  }\n\nComparison:\n- Render props: Explicit, composable, but verbose. Good for when rendering logic varies per consumer.\n- HOCs: Less verbose, good for cross-cutting concerns; harder to debug (wrapper hell).\n- Custom hooks: Cleanest in functional components. Prefer hooks today.\n\nNote: \"children as a function\" is the same pattern:\n  <MouseTracker>{({ x, y }) => <Tooltip x={x} y={y} />}</MouseTracker>"
+  },
+  {
+    "id": "rx_e3",
+    "level": "advanced",
+    "q": "What are React Portals? When would you use them?",
+    "a": "Portals allow rendering a component's output into a different DOM node than its parent.\n\n  ReactDOM.createPortal(children, domNode)\n\n  function Modal({ isOpen, children }) {\n    if (!isOpen) return null;\n    return ReactDOM.createPortal(\n      <div className=\"modal-overlay\">{children}</div>,\n      document.getElementById('modal-root') // outside #root\n    );\n  }\n\nWhy they exist: CSS stacking context issues — a modal inside a deeply nested div with overflow:hidden or z-index stacking would be clipped. Portals render to a different DOM location while keeping the React tree intact.\n\nKey behaviours still hold:\n- Events still bubble through the React tree (not DOM tree).\n- Context still works — portal children can consume context from parent.\n\nUse cases: Modals, tooltips, dropdown menus, toast notifications, popovers."
+  },
+  {
+    "id": "rx_e4",
+    "level": "advanced",
+    "q": "Explain React Server Components (RSC) and how they differ from client components.",
+    "a": "React Server Components (RSC, stable in React 19 / Next.js App Router):\n\nServer Components:\n- Run ONLY on the server — never ship their JS to the client.\n- Can directly access DBs, file system, env secrets.\n- Cannot use useState, useEffect, event handlers, or browser APIs.\n- Zero JS bundle contribution for server-rendered portions.\n- File convention: No \"use client\" directive (default in Next.js App Router).\n\nClient Components:\n- \"use client\" at top of file.\n- Run on client (and also pre-rendered on server for SSR).\n- Can use hooks, events, browser APIs.\n\nMixed tree:\n  // page.tsx (Server Component — fetches data server-side)\n  async function ProductPage({ id }) {\n    const product = await db.products.findById(id); // direct DB call!\n    return <ProductDetail product={product}><AddToCartButton /></ProductDetail>;\n  }\n  // AddToCartButton.tsx — \"use client\" — interactive\n\nBenefits: Massive performance gains — less JS shipped, faster TTI, secure data access.\nLimitation: Cannot pass non-serializable values (functions, class instances) from server to client components."
+  },
+  {
+    "id": "rx_e5",
+    "level": "intermediate",
+    "q": "How does React handle synthetic events? What is event delegation?",
+    "a": "Synthetic Events: React wraps native browser events in a cross-browser wrapper (SyntheticEvent) with the same interface as native events.\n\nEvent Delegation: Instead of attaching individual event listeners to each element, React attaches ONE event listener at the root (document or React root). All events bubble up and React routes them to the correct handler.\n\nBenefits:\n- Fewer memory-consuming listeners.\n- Consistent cross-browser behavior.\n- React can batch and prioritize events.\n\nIn React 17+: Event delegation moved from document to the React root container — enables multiple React roots on one page without conflicts.\n\nImportant:\n- e.preventDefault() still works (prevents default browser behavior).\n- e.stopPropagation() stops React synthetic event bubbling.\n- Accessing event after async call: React 17- pooled events (call e.persist()); React 17+ events are not pooled — access freely.\n\nNative events vs Synthetic events: Native listeners (addEventListener) attached in useEffect fire BEFORE React's synthetic events."
+  },
+  {
+    "id": "rx_e6",
+    "level": "advanced",
+    "q": "What are the React Profiler API and DevTools Profiler? How do you identify performance bottlenecks?",
+    "a": "React Profiler API:\n  import { Profiler } from 'react';\n\n  function onRenderCallback(id, phase, actualDuration, baseDuration) {\n    console.log({ id, phase, actualDuration, baseDuration });\n  }\n  <Profiler id=\"OrderList\" onRender={onRenderCallback}>\n    <OrderList />\n  </Profiler>\n\n  id: component tree identifier\n  phase: \"mount\" or \"update\"\n  actualDuration: time spent rendering (with memoization)\n  baseDuration: estimated time without memoization\n\nReact DevTools Profiler:\n1. Click Record → interact with the app → stop.\n2. Flame chart: Shows which components rendered and how long.\n3. Ranked chart: Sorts by render time (heaviest at top).\n4. \"Why did this render?\": Shows which props/state changed.\n\nWhat to look for:\n- Components re-rendering unnecessarily (check why).\n- Components with high actualDuration (optimize with memo/useMemo).\n- Large gaps between actualDuration and baseDuration → memo is helping.\n- Large gaps where actual ≈ base → memo isn't helping (check key stability)."
+  },
+  {
+    "id": "rx_e7",
+    "level": "intermediate",
+    "q": "What is hydration in React? What causes hydration mismatch errors?",
+    "a": "Hydration: React attaches event listeners and state to server-rendered HTML, making it interactive without re-rendering the DOM from scratch.\n\nProcess:\n1. Server renders HTML string.\n2. Browser receives HTML — user sees content immediately.\n3. React \"hydrates\" — walks the DOM, reconciles with virtual DOM, attaches handlers.\n\nHydration mismatch: When server-rendered HTML doesn't match what React would render on the client.\n\nCommon causes:\n- Date/time rendering (new Date() differs on server vs client).\n- Math.random() / crypto.randomUUID() — different values.\n- Browser-only APIs (window, localStorage) used in render.\n- User's browser timezone vs server timezone.\n\nFixes:\n  // Option 1: Suppress warning (use sparingly)\n  <div suppressHydrationWarning>{new Date().toLocaleDateString()}</div>\n\n  // Option 2: Client-only render with useEffect\n  const [mounted, setMounted] = useState(false);\n  useEffect(() => setMounted(true), []);\n  if (!mounted) return null;\n\nReact 18+ throws on mismatch in dev; in production tries to recover but may cause visual glitches."
+  },
+  {
+    "id": "rx_e8",
+    "level": "beginner",
+    "q": "What is the difference between createElement and JSX? Why does React need to be in scope?",
+    "a": "JSX compiles to React.createElement() calls.\n\n  // JSX\n  <Button color=\"blue\" onClick={handleClick}>Submit</Button>\n\n  // Compiled (React 17- classic transform)\n  React.createElement(Button, { color: \"blue\", onClick: handleClick }, \"Submit\")\n\n  // React 17+ automatic transform (no React import needed)\n  import { jsx as _jsx } from 'react/jsx-runtime';\n  _jsx(Button, { color: \"blue\", onClick: handleClick, children: \"Submit\" });\n\nBefore React 17: React had to be in scope because JSX compiled to React.createElement. Forgetting the import caused \"React is not defined\" error.\n\nAfter React 17+ with automatic JSX transform:\n- No need to import React just for JSX.\n- Still import React for hooks: import { useState } from 'react'.\n\nReact.createElement signature:\n  React.createElement(type, props, ...children)\n  - type: string (\"div\") or component function/class\n  - props: object of props (or null)\n  - children: any number of child nodes"
+  },
+  {
+    "id": "rx_e9",
+    "level": "intermediate",
+    "q": "How do you implement infinite scrolling in React?",
+    "a": "Two main approaches:\n\n1. Intersection Observer (preferred — no scroll event listeners):\n  function useInfiniteScroll(callback) {\n    const observerRef = useRef(null);\n    const lastElementRef = useCallback(node => {\n      if (observerRef.current) observerRef.current.disconnect();\n      observerRef.current = new IntersectionObserver(entries => {\n        if (entries[0].isIntersecting) callback();\n      });\n      if (node) observerRef.current.observe(node);\n    }, [callback]);\n    return lastElementRef;\n  }\n\n  // Usage:\n  const lastItemRef = useInfiniteScroll(fetchNextPage);\n  return items.map((item, i) =>\n    <div ref={i === items.length - 1 ? lastItemRef : null}>{item.name}</div>\n  );\n\n2. Scroll event with throttle:\n  useEffect(() => {\n    const handleScroll = throttle(() => {\n      if (window.innerHeight + scrollY >= document.body.offsetHeight - 100) fetchNextPage();\n    }, 200);\n    window.addEventListener('scroll', handleScroll);\n    return () => window.removeEventListener('scroll', handleScroll);\n  }, []);\n\nLibrary option: TanStack Query's useInfiniteQuery + react-virtual for true virtualization."
+  },
+  {
+    "id": "rx_e10",
+    "level": "expert",
+    "q": "What are React's rules of hooks and why do they exist?",
+    "a": "Two fundamental rules:\n\n1. Only call hooks at the top level:\n  - Never inside loops, conditions, nested functions.\n  - Hooks must be called in the same order every render.\n\n2. Only call hooks from React functions:\n  - Functional components or custom hooks.\n  - Never from class components, event handlers, or regular JS functions.\n\nWhy the order rule exists:\nReact stores hook state in a linked list per component instance. Each hook call corresponds to a slot by index.\n\n  // React internally:\n  [state_0, state_1, state_2, effect_0, ref_0, ...]\n\nIf you call hooks conditionally, the index shifts → wrong state gets assigned to wrong hook.\n\n  // WRONG — different hooks called each render:\n  if (condition) useState(0);    // slot 0 sometimes skipped\n  useState('name');              // now slot 0 instead of slot 1 → WRONG\n\nReact lint rule: eslint-plugin-react-hooks enforces both rules statically.\n\nHow to \"conditionally\" use a hook: Put the condition INSIDE the hook, not around it.\n  const value = useMyHook(); // always call\n  if (!condition) return null; // condition after"
+  },
+  {
+    "id": "rx_e1",
+    "level": "intermediate",
+    "q": "What is a Higher-Order Component (HOC)? Give a real use case.",
+    "a": "A HOC is a function that takes a component and returns a new enhanced component.\n\n  function withAuth(WrappedComponent) {\n    return function AuthGuard(props) {\n      const { isAuthenticated } = useAuth();\n      if (!isAuthenticated) return <Navigate to=\"/login\" />;\n      return <WrappedComponent {...props} />;\n    };\n  }\n  const ProtectedDashboard = withAuth(Dashboard);\n\nReal use cases: Authorization (withAuth), analytics/logging (withLogger), theme injection.\n\nHOC vs Custom Hook:\n- HOC wraps a component tree — affects rendering.\n- Custom hook reuses logic inside a component — no JSX.\n- Prefer custom hooks in modern React (simpler, no wrapper hell).\n\nPitfall: Don't use HOCs inside render — creates a new component type each render."
+  },
+  {
+    "id": "rx_e2",
+    "level": "intermediate",
+    "q": "What are render props? When do you use them over HOCs or hooks?",
+    "a": "Render props: A component accepts a function as a prop and calls it to decide what to render.\n\n  <MouseTracker render={({ x, y }) => <Tooltip x={x} y={y} />} />\n\n  class MouseTracker extends React.Component {\n    state = { x: 0, y: 0 };\n    handleMouseMove = e => this.setState({ x: e.clientX, y: e.clientY });\n    render() {\n      return (\n        <div onMouseMove={this.handleMouseMove}>\n          {this.props.render(this.state)}\n        </div>\n      );\n    }\n  }\n\nComparison:\n- Render props: Explicit, composable, but verbose.\n- HOCs: Less verbose, good for cross-cutting concerns; harder to debug (wrapper hell).\n- Custom hooks: Cleanest in functional components — prefer hooks today.\n\n\"Children as function\" is the same pattern:\n  <MouseTracker>{({ x, y }) => <Tooltip x={x} y={y} />}</MouseTracker>"
+  },
+  {
+    "id": "rx_e3",
+    "level": "advanced",
+    "q": "What are React Portals? When and why would you use them?",
+    "a": "Portals render a component's output into a different DOM node than its parent.\n\n  ReactDOM.createPortal(children, domNode)\n\n  function Modal({ isOpen, children }) {\n    if (!isOpen) return null;\n    return ReactDOM.createPortal(\n      <div className=\"modal-overlay\">{children}</div>,\n      document.getElementById('modal-root') // outside #root\n    );\n  }\n\nWhy: CSS stacking context issues — a modal inside a div with overflow:hidden or low z-index would be clipped. Portals escape the DOM hierarchy while keeping the React tree intact.\n\nKey behaviors still hold:\n- Events still bubble through the React tree (not the DOM tree).\n- Context still works — portal children consume context from parent.\n\nUse cases: Modals, tooltips, dropdown menus, toasts, popovers."
+  },
+  {
+    "id": "rx_e4",
+    "level": "advanced",
+    "q": "Explain React Server Components (RSC). How do they differ from client components?",
+    "a": "Server Components (RSC, stable in React 19 / Next.js App Router):\n- Run ONLY on the server — never ship their JS to the client.\n- Can directly access DBs, file system, env secrets.\n- Cannot use useState, useEffect, event handlers, or browser APIs.\n- Zero JS bundle contribution.\n\nClient Components:\n- \"use client\" at top of file.\n- Run on client (also pre-rendered on server for SSR).\n- Can use hooks, events, browser APIs.\n\nMixed tree:\n  // page.tsx — Server Component\n  async function ProductPage({ id }) {\n    const product = await db.products.findById(id); // direct DB call!\n    return <ProductDetail product={product}><AddToCartButton /></ProductDetail>;\n  }\n  // AddToCartButton.tsx — \"use client\" — interactive button\n\nBenefits: Less JS shipped, faster TTI, secure data access, no useEffect waterfall.\nLimitation: Cannot pass non-serializable values (functions, class instances) to client components."
+  },
+  {
+    "id": "rx_e5",
+    "level": "intermediate",
+    "q": "How does React handle synthetic events and event delegation?",
+    "a": "Synthetic Events: React wraps native browser events in a cross-browser SyntheticEvent wrapper.\n\nEvent Delegation: Instead of attaching listeners to each element, React attaches ONE listener at the root and routes events to correct handlers.\n\nBenefits: Fewer listeners, consistent cross-browser behavior, batched event processing.\n\nReact 17+: Event delegation moved from document to React root — enables multiple React roots on one page.\n\nKey points:\n- e.preventDefault(): Prevents browser's default action (form submit, link navigation).\n- e.stopPropagation(): Stops React synthetic event bubbling.\n- Native addEventListener listeners fire BEFORE React's synthetic events.\n- React 17+ no longer pools events — can access event properties after async without e.persist()."
+  },
+  {
+    "id": "rx_e6",
+    "level": "advanced",
+    "q": "What is hydration in React? What causes hydration mismatch errors?",
+    "a": "Hydration: React attaches event listeners and state to server-rendered HTML, making it interactive without re-rendering the DOM from scratch.\n\nProcess:\n1. Server renders HTML string → browser receives content immediately.\n2. React \"hydrates\" — walks DOM, reconciles with virtual DOM, attaches handlers.\n\nHydration mismatch: Server HTML doesn't match what React would render on client.\n\nCommon causes:\n- Date/time rendering (new Date() differs on server vs client timezone).\n- Math.random() — different values each run.\n- Browser-only APIs (window, localStorage) used in render.\n\nFixes:\n  // Option 1: Suppress warning (use sparingly)\n  <div suppressHydrationWarning>{new Date().toLocaleDateString()}</div>\n\n  // Option 2: Client-only render\n  const [mounted, setMounted] = useState(false);\n  useEffect(() => setMounted(true), []);\n  if (!mounted) return <Skeleton />;\n\nReact 18+ throws on mismatch in dev; in production tries to recover but may cause visual glitches."
+  },
+  {
+    "id": "rx_e7",
+    "level": "advanced",
+    "q": "How do you implement infinite scrolling in React using Intersection Observer?",
+    "a": "Intersection Observer (preferred — no scroll event overhead):\n\n  function useInfiniteScroll(callback, hasMore) {\n    const observerRef = useRef(null);\n    const lastElementRef = useCallback(node => {\n      if (observerRef.current) observerRef.current.disconnect();\n      if (!hasMore) return;\n      observerRef.current = new IntersectionObserver(entries => {\n        if (entries[0].isIntersecting) callback();\n      }, { threshold: 0.1 });\n      if (node) observerRef.current.observe(node);\n    }, [callback, hasMore]);\n    return lastElementRef;\n  }\n\n  // Usage:\n  const { data, fetchNextPage, hasNextPage } = useInfiniteQuery(...);\n  const lastItemRef = useInfiniteScroll(fetchNextPage, hasNextPage);\n\n  return items.map((item, i) =>\n    <div ref={i === items.length - 1 ? lastItemRef : null} key={item.id}>\n      {item.name}\n    </div>\n  );\n\nTanStack Query's useInfiniteQuery manages pages automatically.\nCombine with react-virtual for large lists to also virtualize rendered items."
+  },
+  {
+    "id": "rx_e8",
+    "level": "expert",
+    "q": "What are React's rules of hooks and why do they exist?",
+    "a": "Two fundamental rules:\n\n1. Only call hooks at the top level:\n   Never inside loops, conditions, or nested functions.\n   Hooks must be called in the same order every render.\n\n2. Only call hooks from React functions:\n   Functional components or custom hooks — never class components or plain JS.\n\nWhy the ORDER rule:\nReact stores hook state in a linked list (by index) per component instance.\nIf you call hooks conditionally, the index shifts → wrong state assigned to wrong hook.\n\n  // WRONG:\n  if (condition) useState(0); // slot 0 — sometimes skipped\n  useState('name');           // now gets slot 0 instead of 1 → BUG\n\nCorrect pattern — condition INSIDE the hook:\n  const value = useMyHook(); // always call\n  if (!condition) return null; // condition after hooks\n\neslint-plugin-react-hooks enforces both rules statically.\n\nCustom hooks: Any function starting with \"use\" that calls other hooks. Must follow same rules."
+  },
+  {
+    "id": "rx_e9",
+    "level": "advanced",
+    "q": "What is React.useId() and when was it introduced?",
+    "a": "useId(): Hook introduced in React 18 that generates a unique, stable ID.\n\n  function Form() {\n    const id = useId();\n    return (\n      <>\n        <label htmlFor={id + \"-email\"}>Email</label>\n        <input id={id + \"-email\"} type=\"email\" />\n        <label htmlFor={id + \"-password\"}>Password</label>\n        <input id={id + \"-password\"} type=\"password\" />\n      </>\n    );\n  }\n\nWhy it exists:\n- IDs must be unique per page for accessibility (label → input association).\n- Math.random() is different on server vs client → hydration mismatch.\n- Counter-based IDs with useState don't survive SSR either.\n- useId generates the SAME ID on server and client (based on component position in the tree).\n\nRules:\n- Don't use as list keys (not stable across renders if list order changes).\n- Don't use for CSS selectors across renders.\n- Generates IDs like \":r0:\", \":r1:\" — not pretty but unique."
+  },
+  {
+    "id": "rx_e10",
+    "level": "intermediate",
+    "q": "How do you optimize React context to prevent unnecessary re-renders?",
+    "a": "Problem: Every context value change re-renders ALL consumers, even if they only use part of the value.\n\n  const ThemeContext = React.createContext(null);\n  // If ThemeContext value is { theme, user }, ALL consumers re-render when user changes.\n\nSolutions:\n\n1. Split contexts (simplest):\n  const ThemeContext = createContext(null);   // only theme\n  const UserContext = createContext(null);    // only user\n  // Consumers only re-render when their specific context changes.\n\n2. Memoize the context value:\n  const value = useMemo(() => ({ theme, toggleTheme }), [theme]);\n  <ThemeContext.Provider value={value}>\n\n3. Use a state manager for frequent updates:\n  Context is not optimized for high-frequency updates (every keystroke).\n  Use Zustand, Jotai, or Redux for frequently changing global state.\n\n4. Selector pattern with useSyncExternalStore:\n  Zustand uses this internally — consumers subscribe to only the slices they need.\n\n5. React.memo on consumer components:\n  Prevents re-render if props haven't changed (context change still re-renders).\n\nRule: Context is great for infrequently changing global values (theme, locale, auth user). Not for frequently changing state (form values, real-time data)."
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "db1",
+    "level": "beginner",
+    "q": "Explain the difference between INNER JOIN, LEFT JOIN, RIGHT JOIN, and FULL OUTER JOIN.",
+    "a": "INNER JOIN: Returns rows where there is a match in BOTH tables.\n  SELECT * FROM Orders o INNER JOIN Customers c ON o.CustomerId = c.Id\n  -- Only orders that have a matching customer.\n\nLEFT JOIN: All rows from the LEFT table, matched rows from RIGHT (NULLs for no match).\n  -- All orders, even those without a customer record.\n\nRIGHT JOIN: All rows from RIGHT, matched from LEFT. (Rarely used; prefer LEFT JOIN by swapping tables.)\n\nFULL OUTER JOIN: All rows from BOTH tables. NULLs where no match.\n  -- All orders AND all customers, even unmatched.\n\nCROSS JOIN: Cartesian product — every row from A × every row from B. No ON condition.\n\nNULL check for unmatched: WHERE c.Id IS NULL (find orders with no customer)."
+  },
+  {
+    "id": "db2",
+    "level": "beginner",
+    "q": "What is the difference between WHERE and HAVING?",
+    "a": "WHERE: Filters rows BEFORE grouping (cannot reference aggregate functions).\n  SELECT dept, COUNT(*) FROM employees WHERE salary > 50000 GROUP BY dept;\n  -- Filters individual employees first, then groups.\n\nHAVING: Filters groups AFTER GROUP BY (can reference aggregate functions).\n  SELECT dept, COUNT(*) as cnt FROM employees GROUP BY dept HAVING COUNT(*) > 5;\n  -- Filters departments that have more than 5 employees.\n\nOrder of execution:\n  FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT\n\nYou can use both:\n  SELECT dept, AVG(salary) FROM employees\n  WHERE active = true\n  GROUP BY dept\n  HAVING AVG(salary) > 60000;"
+  },
+  {
+    "id": "db3",
+    "level": "intermediate",
+    "q": "What are window functions? Explain ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD.",
+    "a": "Window functions compute values across a set of rows related to the current row (the \"window\"), without collapsing them like GROUP BY.\n\n  SELECT name, dept, salary,\n    ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC) as row_num,\n    RANK() OVER (PARTITION BY dept ORDER BY salary DESC) as rnk,\n    DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) as dense_rnk,\n    LAG(salary)  OVER (ORDER BY hire_date) as prev_salary,\n    LEAD(salary) OVER (ORDER BY hire_date) as next_salary\n  FROM employees;\n\nROW_NUMBER: Unique sequential number, no ties (1,2,3,4).\nRANK:        Ties get same rank, next rank skips (1,1,3,4).\nDENSE_RANK:  Ties get same rank, no gaps (1,1,2,3).\nLAG(col, n): Value from n rows BEFORE current row.\nLEAD(col, n): Value from n rows AFTER current row.\n\nUse case: Ranking top-N per group, running totals (SUM() OVER), moving averages."
+  },
+  {
+    "id": "db4",
+    "level": "intermediate",
+    "q": "What are CTEs and recursive CTEs? When would you use them?",
+    "a": "CTE (Common Table Expression): Named temporary result set for the duration of one query.\n  WITH RecentOrders AS (\n    SELECT * FROM orders WHERE created_at > NOW() - INTERVAL '7 days'\n  )\n  SELECT customer_id, COUNT(*) FROM RecentOrders GROUP BY customer_id;\n\nBenefits: Readability, reuse within query, alternative to subqueries.\n\nRecursive CTE: References itself to traverse hierarchical data (org charts, tree structures).\n  WITH RECURSIVE OrgTree AS (\n    SELECT id, name, manager_id, 0 AS level\n    FROM employees WHERE manager_id IS NULL  -- anchor: root\n    UNION ALL\n    SELECT e.id, e.name, e.manager_id, o.level + 1\n    FROM employees e JOIN OrgTree o ON e.manager_id = o.id  -- recursive\n  )\n  SELECT * FROM OrgTree ORDER BY level;\n\nUse cases: Hierarchy traversal, graph paths, generating date series."
+  },
+  {
+    "id": "db5",
+    "level": "intermediate",
+    "q": "Explain database indexes — types and query optimization strategy.",
+    "a": "Index: A data structure (B-tree by default) that speeds up data retrieval at the cost of storage and write performance.\n\nIndex types in PostgreSQL:\n- B-tree (default): Equality and range queries. Most common.\n- Hash: Only equality checks — no range.\n- GiST/GIN: Full-text search, JSONB, array contains.\n- BRIN: Large, sequentially ordered data (timestamps in time-series).\n- Partial: Index only rows matching a condition.\n\n  CREATE INDEX idx_orders_customer ON orders(customer_id); -- B-tree\n  CREATE INDEX idx_active ON users(email) WHERE active = true; -- partial\n  CREATE INDEX idx_name_age ON users(last_name, first_name); -- composite\n\nComposite index rule: Most selective column first; queries must use leading columns (prefix rule).\n\nEXPLAIN ANALYZE: Always check the query plan:\n  EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 42;\n  -- Look for: Seq Scan (no index) vs Index Scan vs Bitmap Heap Scan"
+  },
+  {
+    "id": "db6",
+    "level": "advanced",
+    "q": "What is MVCC in PostgreSQL and how does it affect vacuum?",
+    "a": "MVCC (Multi-Version Concurrency Control): PostgreSQL never overwrites rows in place. Instead:\n- UPDATE: Inserts a new version of the row with a new xmax/xmin.\n- DELETE: Marks the old row as dead (sets xmax).\n- Each transaction sees a snapshot of the DB at a point in time → no read locks needed.\n\nProblem: Dead row versions (\"dead tuples\") accumulate on disk → table bloat, slower scans.\n\nVACUUM:\n- Reclaims dead tuple space so it can be reused.\n- Does NOT shrink table file (VACUUM FULL does, but locks the table).\n- autovacuum: Background worker runs VACUUM automatically.\n\nANALYZE:\n- Updates statistics used by the query planner to choose optimal plans.\n- VACUUM ANALYZE: Both in one.\n\nMonitoring:\n  SELECT relname, n_dead_tup, last_autovacuum FROM pg_stat_user_tables;\n\nbloat: Use pg_bloat_check or pgstattuple for diagnosis."
+  },
+  {
+    "id": "db7",
+    "level": "advanced",
+    "q": "Explain PostgreSQL table partitioning — when and how to use it.",
+    "a": "Partitioning: Splitting a large table into smaller sub-tables (partitions) by a partition key.\n\nTypes:\n- Range: By range of values (e.g., date).\n- List: By discrete values (e.g., region).\n- Hash: By hash of key (for even distribution).\n\nExample (range by year):\n  CREATE TABLE orders (\n    id BIGINT, order_date DATE, total DECIMAL\n  ) PARTITION BY RANGE (order_date);\n\n  CREATE TABLE orders_2023 PARTITION OF orders\n    FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');\n  CREATE TABLE orders_2024 PARTITION OF orders\n    FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');\n\nBenefits:\n- Partition pruning: Queries filtered by partition key only scan relevant partitions.\n- Faster data archiving: DROP TABLE orders_2020 (instant).\n- Parallel query support across partitions.\n\nWhen to use: Tables with 10M+ rows, time-series data, multi-tenant systems."
+  },
+  {
+    "id": "db8",
+    "level": "advanced",
+    "q": "What is query optimization? How do you diagnose and fix a slow query?",
+    "a": "Step 1: EXPLAIN ANALYZE\n  EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) SELECT ...;\n  - Look for: Seq Scan on large tables, Nested Loop with many rows, sort on disk.\n\nStep 2: Identify bottlenecks:\n- No index → Add appropriate index.\n- Index not used → Column cast/function prevents index use (WHERE LOWER(email) = '...' needs functional index).\n- N+1 queries → Use JOIN or batch loading.\n- SELECT * → Select only needed columns.\n\nStep 3: Fix strategies:\n- Add/fix indexes (partial, composite, covering indexes).\n  CREATE INDEX ON orders(customer_id, created_at) INCLUDE (total); -- covering\n- Rewrite correlated subqueries as JOINs.\n- Use CTEs for readability; inline for performance.\n- Increase work_mem for complex sorts/joins.\n- Use connection pooling (PgBouncer) to reduce connection overhead.\n- Denormalize hot read paths if necessary.\n\nStep 4: pg_stat_statements:\n  SELECT query, calls, mean_exec_time FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;"
+  },
+  {
+    "id": "db9",
+    "level": "expert",
+    "q": "How do you prevent deadlocks in PostgreSQL?",
+    "a": "Deadlock: Two transactions each waiting for a lock the other holds.\n  TX1: Lock A → wait for B\n  TX2: Lock B → wait for A → DEADLOCK\n\nPostgreSQL detects and resolves deadlocks by killing one transaction.\n\nPrevention strategies:\n1. Consistent lock ordering: Always acquire locks in the same order across all transactions.\n   -- Always update User before Order, never the reverse.\n\n2. Keep transactions short: Minimize time locks are held.\n\n3. Use SELECT ... FOR UPDATE NOWAIT or SKIP LOCKED:\n   SELECT * FROM jobs WHERE status = 'pending' LIMIT 1 FOR UPDATE SKIP LOCKED;\n   -- Skip locked rows (job queue pattern) — avoids waiting.\n\n4. Avoid user interaction within transactions.\n\n5. Use advisory locks for application-level locking:\n   SELECT pg_advisory_lock(12345); -- named, explicit lock\n\n6. Monitor:\n   SELECT * FROM pg_locks WHERE NOT granted;\n   SELECT * FROM pg_stat_activity WHERE wait_event_type = 'Lock';"
+  }
+]

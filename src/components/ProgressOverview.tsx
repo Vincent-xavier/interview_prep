@@ -15,11 +15,11 @@ export default function ProgressOverview({ stats }: Props) {
       <div className="prog-divider" />
       <div className="prog-stat">
         <div className="prog-val correct">{stats.correct}</div>
-        <div className="prog-lbl">Correct</div>
+        <div className="prog-lbl">Know it</div>
       </div>
       <div className="prog-stat">
         <div className="prog-val wrong">{stats.wrong}</div>
-        <div className="prog-lbl">Wrong</div>
+        <div className="prog-lbl">Needs review</div>
       </div>
       <div className="prog-stat">
         <div className="prog-val skipped">{stats.skipped}</div>
@@ -28,7 +28,7 @@ export default function ProgressOverview({ stats }: Props) {
       <div className="prog-divider" />
       <div className="prog-bar-wrap">
         <div className="prog-bar-top">
-          <span>Overall Progress</span>
+          <span>Cards reviewed</span>
           <span>{pct}%</span>
         </div>
         <div className="prog-bar-bg">

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "s1",
+    "level": "beginner",
+    "q": "What are the 4 pillars of Object-Oriented Programming?",
+    "a": "1. Encapsulation: Bundling data and methods that operate on it into a class; hiding internal details via access modifiers (private, protected, public).\n  // private fields, public properties/methods expose controlled interface.\n\n2. Abstraction: Hiding implementation complexity; exposing only what's needed.\n  // abstract class / interface defines what, not how.\n\n3. Inheritance: A class (child) derives behavior and properties from another class (parent).\n  // \"is-a\" relationship: Dog : Animal.\n  // Enables code reuse but creates tight coupling (prefer composition).\n\n4. Polymorphism: Same interface, different implementations at runtime.\n  - Compile-time (overloading): Same method name, different parameters.\n  - Runtime (overriding): virtual/override; base class reference holds derived instance.\n    Animal a = new Dog(); a.Speak(); // calls Dog.Speak() — runtime dispatch."
+  },
+  {
+    "id": "s2",
+    "level": "beginner",
+    "q": "Explain each SOLID principle with a brief example.",
+    "a": "S — Single Responsibility: A class should have one reason to change.\n  Bad: OrderService handles business logic + emails + logging.\n  Good: Separate EmailService, OrderLogger, OrderProcessor.\n\nO — Open/Closed: Open for extension, closed for modification.\n  Add new payment types by implementing IPaymentProcessor — not modifying existing code.\n\nL — Liskov Substitution: Subclasses must be substitutable for their base class.\n  If Bird has Fly(), a Penguin : Bird that throws NotImplementedException violates LSP.\n\nI — Interface Segregation: Don't force clients to depend on methods they don't use.\n  Split IAnimal into ISwimmable, IFlyable — not all animals implement both.\n\nD — Dependency Inversion: Depend on abstractions, not concretions.\n  OrderService(IEmailService emailService) — injected; doesn't new up EmailService."
+  },
+  {
+    "id": "s3",
+    "level": "intermediate",
+    "q": "What is the Repository pattern? How do you implement it with EF Core?",
+    "a": "Repository pattern: Abstracts data access behind an interface, decoupling business logic from the ORM.\n\nInterface:\n  public interface IOrderRepository {\n    Task<Order?> GetByIdAsync(int id);\n    Task<IList<Order>> GetByCustomerAsync(int customerId);\n    Task AddAsync(Order order);\n    Task SaveChangesAsync();\n  }\n\nImplementation:\n  public class OrderRepository(AppDbContext db) : IOrderRepository {\n    public Task<Order?> GetByIdAsync(int id) => db.Orders.FindAsync(id).AsTask();\n    public Task AddAsync(Order o) => db.Orders.AddAsync(o).AsTask();\n    public Task SaveChangesAsync() => db.SaveChangesAsync();\n  }\n\nUnit of Work: Groups repositories that share a DbContext — SaveChanges once for all.\n\nBenefits: Easily swap EF Core for Dapper/MongoDB; testable with mock/in-memory repos.\nCaution: Don't leak IQueryable through the interface — defeats the abstraction."
+  },
+  {
+    "id": "s4",
+    "level": "intermediate",
+    "q": "Explain the Strategy and Factory design patterns.",
+    "a": "Strategy Pattern: Define a family of algorithms, encapsulate each, and make them interchangeable.\n  interface IDiscountStrategy { decimal Apply(decimal price); }\n  class VipDiscount : IDiscountStrategy { public decimal Apply(decimal p) => p * 0.8m; }\n  class NoDiscount : IDiscountStrategy { public decimal Apply(decimal p) => p; }\n  \n  class OrderService(IDiscountStrategy discount) {\n    public decimal GetPrice(decimal price) => discount.Apply(price);\n  }\n  // Change algorithm without touching OrderService.\n\nFactory Method: Define an interface for creating objects; subclasses decide what to instantiate.\n  abstract class NotificationFactory { public abstract INotification Create(); }\n  class EmailFactory : NotificationFactory { public override INotification Create() => new EmailNotification(); }\n  class SmsFactory : NotificationFactory { public override INotification Create() => new SmsNotification(); }\n\nAbstract Factory: Creates families of related objects (Email+SMS vs Push+InApp).\nSimple Factory (not GoF): Static method that returns instances — useful for simple cases."
+  },
+  {
+    "id": "s5",
+    "level": "advanced",
+    "q": "What is the Observer pattern and how is it used in .NET (events/delegates)?",
+    "a": "Observer pattern: Subject notifies multiple observers when state changes (publish-subscribe).\n\n.NET events implement this natively:\n  public class Order {\n    public event EventHandler<OrderStatusChangedEventArgs>? StatusChanged;\n    private OrderStatus _status;\n    public OrderStatus Status {\n      set { _status = value; StatusChanged?.Invoke(this, new(value)); }\n    }\n  }\n  \n  // Observers subscribe:\n  order.StatusChanged += (sender, args) => emailService.NotifyCustomer(args.NewStatus);\n  order.StatusChanged += (sender, args) => auditLog.Record(args.NewStatus);\n\nMediatR library (CQRS-friendly pub/sub):\n  // Publish:\n  await mediator.Publish(new OrderCreatedNotification(order));\n  // Handler:\n  public class SendEmailOnOrderCreated : INotificationHandler<OrderCreatedNotification> {\n    public Task Handle(OrderCreatedNotification n, CancellationToken ct) => email.SendAsync(n.Order);\n  }\n\nIObservable<T> / IObserver<T>: For Rx (Reactive Extensions) — streaming, composable pipelines."
+  },
+  {
+    "id": "s6",
+    "level": "advanced",
+    "q": "What is the Decorator pattern? Implement a logging decorator for a service.",
+    "a": "Decorator: Wraps an object to add behavior without modifying the original class.\n\nInterface:\n  public interface IOrderService { Task<Order> CreateAsync(CreateOrderDto dto); }\n\nBase implementation:\n  public class OrderService(IOrderRepository repo) : IOrderService {\n    public async Task<Order> CreateAsync(CreateOrderDto dto) {\n      var order = dto.MapToOrder();\n      await repo.AddAsync(order);\n      return order;\n    }\n  }\n\nDecorator:\n  public class LoggingOrderService(IOrderService inner, ILogger<LoggingOrderService> logger)\n    : IOrderService {\n    public async Task<Order> CreateAsync(CreateOrderDto dto) {\n      logger.LogInformation(\"Creating order for product {Id}\", dto.ProductId);\n      var sw = Stopwatch.StartNew();\n      var result = await inner.CreateAsync(dto);\n      logger.LogInformation(\"Order {Id} created in {ms}ms\", result.Id, sw.ElapsedMilliseconds);\n      return result;\n    }\n  }\n\nRegister:\n  services.AddScoped<OrderService>();\n  services.AddScoped<IOrderService>(sp =>\n    new LoggingOrderService(sp.GetRequiredService<OrderService>(), sp.GetRequiredService<ILogger<LoggingOrderService>>()));"
+  },
+  {
+    "id": "s7",
+    "level": "expert",
+    "q": "What is Hexagonal Architecture (Ports and Adapters)? How does it apply to a .NET API?",
+    "a": "Hexagonal Architecture (Alistair Cockburn): The application core is isolated from external systems (DB, UI, APIs) through ports (interfaces) and adapters (implementations).\n\nThree layers:\n1. Domain Core: Pure business logic, entities, domain events. No dependencies on external systems.\n2. Application Layer: Use cases (commands/queries), orchestrates domain. Depends only on domain + ports.\n3. Infrastructure Layer: Adapters for DB (EF Core), message queues, email, HTTP clients.\n\nPorts: Interfaces defined by the application.\n  IOrderRepository, IEmailPort, IPaymentGateway (in Application project)\n\nAdapters: Implementations in Infrastructure.\n  EfCoreOrderRepository : IOrderRepository\n  SendGridEmailAdapter : IEmailPort\n\nProject structure:\n  Domain/          → Entities, Value Objects, Domain Events (no dependencies)\n  Application/     → Commands, Queries, Handlers, IRepository interfaces\n  Infrastructure/  → EF Core, email, external APIs\n  Api/             → Controllers, minimal APIs, DI composition root\n\nBenefits: Domain testable without DB or HTTP; swap EF Core for Dapper without touching domain; clear boundaries."
+  }
+]

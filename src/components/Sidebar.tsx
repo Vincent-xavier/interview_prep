@@ -49,7 +49,12 @@ function CatItem({
   const pct = qs.length > 0 ? (st.answered / qs.length) * 100 : 0;
 
   return (
-    <div className={`cat-item${active ? ' active' : ''}`} onClick={() => onSelect(cat.id)}>
+    <button
+      type="button"
+      className={`cat-item${active ? ' active' : ''}`}
+      aria-current={active ? 'page' : undefined}
+      onClick={() => onSelect(cat.id)}
+    >
       <div className="cat-row">
         <span className="cat-icon">{cat.icon}</span>
         <span className="cat-label">{cat.label}</span>
@@ -65,6 +70,6 @@ function CatItem({
           {st.skipped  > 0 && <span className="s">→{st.skipped}</span>}
         </div>
       )}
-    </div>
+    </button>
   );
 }
